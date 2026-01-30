@@ -1,21 +1,42 @@
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
 
 class DB {
   constructor(dbPath) {
-    const dir = path.dirname(dbPath);
+    this.dbPath = dbPath;
+    this.db = null;
+    this.ready = this.init();
+  }
+
+  async init() {
+    const dir = path.dirname(this.dbPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
+    const SQL = await initSqlJs();
+    
+    if (fs.existsSync(this.dbPath)) {
+      const buffer = fs.readFileSync(this.dbPath);
+      this.db = new SQL.Database(buffer);
+    } else {
+      this.db = new SQL.Database();
+    }
+    
     this.initTables();
+    this.save();
+  }
+
+  save() {
+    if (this.db) {
+      const data = this.db.export();
+      fs.writeFileSync(this.dbPath, data);
+    }
   }
 
   initTables() {
-    this.db.exec(`
+    this.db.run(`
       CREATE TABLE IF NOT EXISTS channels (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         url TEXT NOT NULL UNIQUE,
@@ -79,23 +100,29 @@ class DB {
       INSERT INTO channels (url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, rescrape_interval_days)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(
+    stmt.run([
       url,
       options.playlist_mode || 'enumerate',
       options.flat_mode ? 1 : 0,
       options.auto_add_new_playlists ? 1 : 0,
       options.yt_dlp_options || null,
       options.rescrape_interval_days || 7
-    );
-    return result.lastInsertRowid;
+    ]);
+    const result = this.db.exec('SELECT last_insert_rowid() as id');
+    this.save();
+    return result[0].values[0][0];
   }
 
   getChannel(id) {
-    return this.db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
+    const result = this.db.exec('SELECT * FROM channels WHERE id = ?', [id]);
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return this.rowToObject(result[0].columns, result[0].values[0]);
   }
 
   getAllChannels() {
-    return this.db.prepare('SELECT * FROM channels ORDER BY created_at DESC').all();
+    const result = this.db.exec('SELECT * FROM channels ORDER BY created_at DESC');
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   updateChannel(id, data) {
@@ -134,44 +161,48 @@ class DB {
     fields.push('updated_at = strftime("%s", "now")');
     values.push(id);
 
-    const stmt = this.db.prepare(`UPDATE channels SET ${fields.join(', ')} WHERE id = ?`);
-    return stmt.run(...values);
+    this.db.run(`UPDATE channels SET ${fields.join(', ')} WHERE id = ?`, values);
+    this.save();
   }
 
   deleteChannel(id) {
-    return this.db.prepare('DELETE FROM channels WHERE id = ?').run(id);
+    this.db.run('DELETE FROM channels WHERE id = ?', [id]);
+    this.save();
   }
 
   // Playlists
   addPlaylist(channelId, playlistData) {
-    const stmt = this.db.prepare(`
+    this.db.run(`
       INSERT INTO playlists (channel_id, playlist_id, playlist_title, playlist_url, enabled)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(channel_id, playlist_id) DO UPDATE SET
         playlist_title = excluded.playlist_title,
         playlist_url = excluded.playlist_url,
         updated_at = strftime('%s', 'now')
-    `);
-    return stmt.run(
+    `, [
       channelId,
       playlistData.playlist_id,
       playlistData.playlist_title,
       playlistData.playlist_url,
       playlistData.enabled ? 1 : 0
-    );
+    ]);
+    this.save();
   }
 
   getPlaylistsByChannel(channelId) {
-    return this.db.prepare('SELECT * FROM playlists WHERE channel_id = ? ORDER BY playlist_title').all(channelId);
+    const result = this.db.exec('SELECT * FROM playlists WHERE channel_id = ? ORDER BY playlist_title', [channelId]);
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   updatePlaylistEnabled(id, enabled) {
-    return this.db.prepare('UPDATE playlists SET enabled = ?, updated_at = strftime("%s", "now") WHERE id = ?').run(enabled ? 1 : 0, id);
+    this.db.run('UPDATE playlists SET enabled = ?, updated_at = strftime("%s", "now") WHERE id = ?', [enabled ? 1 : 0, id]);
+    this.save();
   }
 
   // Videos
   addVideo(videoData) {
-    const stmt = this.db.prepare(`
+    this.db.run(`
       INSERT INTO videos (
         channel_id, playlist_id, video_id, video_title, video_url,
         uploader, upload_date, duration, playlist_index, download_status
@@ -180,8 +211,7 @@ class DB {
       ON CONFLICT(video_id) DO UPDATE SET
         video_title = excluded.video_title,
         updated_at = strftime('%s', 'now')
-    `);
-    return stmt.run(
+    `, [
       videoData.channel_id,
       videoData.playlist_id || null,
       videoData.video_id,
@@ -192,28 +222,44 @@ class DB {
       videoData.duration,
       videoData.playlist_index || null,
       videoData.download_status || 'pending'
-    );
+    ]);
+    this.save();
   }
 
   getVideosByChannel(channelId) {
-    return this.db.prepare('SELECT * FROM videos WHERE channel_id = ? ORDER BY created_at DESC').all(channelId);
+    const result = this.db.exec('SELECT * FROM videos WHERE channel_id = ? ORDER BY created_at DESC', [channelId]);
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   getVideosByPlaylist(playlistId) {
-    return this.db.prepare('SELECT * FROM videos WHERE playlist_id = ? ORDER BY playlist_index, created_at').all(playlistId);
+    const result = this.db.exec('SELECT * FROM videos WHERE playlist_id = ? ORDER BY playlist_index, created_at', [playlistId]);
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   updateVideoStatus(videoId, status, filePath = null, downloadedAt = null) {
-    const stmt = this.db.prepare(`
+    this.db.run(`
       UPDATE videos 
       SET download_status = ?, file_path = ?, downloaded_at = ?, updated_at = strftime('%s', 'now')
       WHERE video_id = ?
-    `);
-    return stmt.run(status, filePath, downloadedAt, videoId);
+    `, [status, filePath, downloadedAt, videoId]);
+    this.save();
+  }
+
+  rowToObject(columns, values) {
+    const obj = {};
+    columns.forEach((col, i) => {
+      obj[col] = values[i];
+    });
+    return obj;
   }
 
   close() {
-    this.db.close();
+    this.save();
+    if (this.db) {
+      this.db.close();
+    }
   }
 }
 
