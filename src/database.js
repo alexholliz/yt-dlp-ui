@@ -308,8 +308,10 @@ class DB {
         c.channel_name,
         c.url,
         c.playlist_mode,
+        c.last_scraped_at,
         COUNT(CASE WHEN v.download_status = 'pending' THEN 1 END) as pending_count,
-        COUNT(CASE WHEN v.download_status = 'completed' THEN 1 END) as completed_count
+        COUNT(CASE WHEN v.download_status = 'completed' THEN 1 END) as completed_count,
+        (SELECT COUNT(*) FROM playlists WHERE channel_id = c.id) as playlist_count
       FROM channels c
       LEFT JOIN videos v ON c.id = v.channel_id
       GROUP BY c.id

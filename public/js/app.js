@@ -146,20 +146,36 @@ async function loadChannelsPage() {
       return;
     }
     
-    tbody.innerHTML = channelStats.map(c => `
-      <tr>
-        <td><a href="#" onclick="viewChannel(${c.id}); return false;">${escapeHtml(c.channel_name || 'Loading...')}</a></td>
-        <td>${c.pending_count || 0}</td>
-        <td>${c.completed_count || 0}</td>
-        <td>-</td>
-        <td>
-          <label class="toggle-switch">
-            <input type="checkbox" checked onchange="toggleChannel(${c.id}, this.checked)">
-            <span class="slider"></span>
-          </label>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = channelStats.map(c => {
+      const isEnumerating = !c.channel_name && c.playlist_mode === 'enumerate';
+      const hasPlaylists = c.playlist_count > 0;
+      const channelDisplay = c.channel_name || (isEnumerating ? '⏳ Enumerating...' : 'Unknown');
+      
+      return `
+        <tr>
+          <td>
+            <a href="#" onclick="viewChannel(${c.id}); return false;">${escapeHtml(channelDisplay)}</a>
+            ${isEnumerating ? `
+              <div style="margin-top: 0.5rem;">
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${hasPlaylists ? '100' : '50'}%"></div>
+                </div>
+                <small style="color: var(--text-muted);">${hasPlaylists ? 'Complete' : 'In progress...'}</small>
+              </div>
+            ` : ''}
+          </td>
+          <td>${c.pending_count || 0}</td>
+          <td>${c.completed_count || 0}</td>
+          <td>-</td>
+          <td>
+            <label class="toggle-switch">
+              <input type="checkbox" checked onchange="toggleChannel(${c.id}, this.checked)">
+              <span class="slider"></span>
+            </label>
+          </td>
+        </tr>
+      `;
+    }).join('');
   } catch (err) {
     console.error('Failed to load channels:', err);
   }
@@ -431,6 +447,8 @@ function startPolling() {
     if (activePage === 'page-home') {
       loadStats();
       loadQueue();
+    } else if (activePage === 'page-channels') {
+      loadChannelsPage(); // Refresh to show enumeration progress
     }
   }, 5000);
 }
