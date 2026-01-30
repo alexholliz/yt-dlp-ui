@@ -195,6 +195,12 @@ class DB {
     return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
+  getPlaylist(id) {
+    const result = this.db.exec('SELECT * FROM playlists WHERE id = ?', [id]);
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return this.rowToObject(result[0].columns, result[0].values[0]);
+  }
+
   updatePlaylistEnabled(id, enabled) {
     this.db.run('UPDATE playlists SET enabled = ?, updated_at = strftime("%s", "now") WHERE id = ?', [enabled ? 1 : 0, id]);
     this.save();

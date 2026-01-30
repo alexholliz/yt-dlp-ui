@@ -11,72 +11,109 @@
     <header>
       <h1>🎬 yt-dlp-ui</h1>
       <p class="subtitle">Intelligent YouTube Download Manager</p>
+      <div class="header-actions">
+        <button class="btn btn-small btn-secondary" onclick="openSettings()">⚙️ Settings</button>
+        <div id="download-status" class="download-status"></div>
+      </div>
     </header>
 
     <main>
-      <!-- Add Channel Section -->
-      <section class="card">
-        <h2>Add Channel</h2>
-        <form id="add-channel-form">
-          <div class="form-group">
-            <label for="channel-url">Channel URL</label>
-            <input 
-              type="text" 
-              id="channel-url" 
-              placeholder="https://www.youtube.com/@channelname"
-              required
-            >
-          </div>
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="add">Add Content</button>
+        <button class="tab-btn" data-tab="channels">Channels</button>
+        <button class="tab-btn" data-tab="downloads">Downloads</button>
+      </div>
 
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="playlist-mode" checked>
-              Enumerate Playlists
-            </label>
-          </div>
-
-          <div class="form-group" id="playlist-options">
-            <label>
-              <input type="checkbox" id="auto-add-playlists">
-              Auto-enable new playlists
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="flat-mode">
-              Flat mode (download all videos to single folder)
-            </label>
-          </div>
-
-          <details class="advanced-options">
-            <summary>Advanced Options</summary>
+      <!-- Add Content Tab -->
+      <div class="tab-content active" id="tab-add">
+        <section class="card">
+          <h2>Add Content</h2>
+          <p class="help-text">Add a channel, playlist, or single video URL</p>
+          <form id="add-channel-form">
             <div class="form-group">
-              <label for="yt-dlp-options">Custom yt-dlp options</label>
-              <textarea 
-                id="yt-dlp-options" 
-                placeholder="--format best --write-info-json"
-                rows="3"
-              ></textarea>
-              <small>Space-separated yt-dlp command line options</small>
+              <label for="channel-url">YouTube URL</label>
+              <input 
+                type="text" 
+                id="channel-url" 
+                placeholder="Channel, Playlist, or Video URL"
+                required
+              >
+              <small>Examples: @channelname, /playlists URL, playlist?list=..., or watch?v=...</small>
             </div>
+
             <div class="form-group">
-              <label for="rescrape-days">Re-scrape interval (days)</label>
-              <input type="number" id="rescrape-days" value="7" min="1">
+              <label>
+                <input type="checkbox" id="playlist-mode" checked>
+                Enumerate Playlists (for channels)
+              </label>
             </div>
-          </details>
 
-          <button type="submit" class="btn btn-primary">Add Channel</button>
-        </form>
-      </section>
+            <div class="form-group" id="playlist-options">
+              <label>
+                <input type="checkbox" id="auto-add-playlists">
+                Auto-enable new playlists
+              </label>
+            </div>
 
-      <!-- Channels List -->
-      <section class="card">
-        <h2>Channels</h2>
-        <div id="channels-list">
-          <p class="empty-state">No channels added yet. Add one above to get started!</p>
-        </div>
-      </section>
+            <div class="form-group">
+              <label>
+                <input type="checkbox" id="flat-mode">
+                Flat mode (single folder, not organized by playlist)
+              </label>
+            </div>
+
+            <details class="advanced-options">
+              <summary>Advanced Options</summary>
+              <div class="form-group">
+                <label for="yt-dlp-options">Custom yt-dlp options</label>
+                <textarea 
+                  id="yt-dlp-options" 
+                  placeholder="--format best --write-thumbnail"
+                  rows="3"
+                ></textarea>
+                <small>Space-separated yt-dlp command line options</small>
+              </div>
+              <div class="form-group">
+                <label for="rescrape-days">Re-scrape interval (days)</label>
+                <input type="number" id="rescrape-days" value="7" min="1">
+              </div>
+            </details>
+
+            <button type="submit" class="btn btn-primary">Add</button>
+          </form>
+        </section>
+      </div>
+
+      <!-- Channels Tab -->
+      <div class="tab-content" id="tab-channels">
+        <section class="card">
+          <h2>Channels</h2>
+          <div id="channels-list">
+            <p class="empty-state">No channels added yet. Add one in the "Add Content" tab!</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Downloads Tab -->
+      <div class="tab-content" id="tab-downloads">
+        <section class="card">
+          <h2>Downloads & Queue</h2>
+          <div id="downloads-info">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-value" id="stat-queue">0</div>
+                <div class="stat-label">In Queue</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="stat-active">0</div>
+                <div class="stat-label">Downloading</div>
+              </div>
+            </div>
+            <div id="active-downloads"></div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 
@@ -89,6 +126,42 @@
       </div>
       <div class="modal-body" id="modal-body">
         <!-- Content loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h3>Scheduler</h3>
+        <div class="form-group">
+          <label for="scheduler-interval">Check interval (days)</label>
+          <input type="number" id="scheduler-interval" value="7" min="1">
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="startScheduler()">Start Scheduler</button>
+          <button class="btn btn-secondary" onclick="stopScheduler()">Stop Scheduler</button>
+        </div>
+        <div id="scheduler-status"></div>
+
+        <hr>
+
+        <h3>Cookie Management</h3>
+        <p class="help-text">Upload your YouTube cookies for age-restricted or member-only content</p>
+        <div class="form-group">
+          <label for="cookies-content">Cookies (Netscape format)</label>
+          <textarea id="cookies-content" rows="10" placeholder="# Netscape HTTP Cookie File..."></textarea>
+        </div>
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="saveCookies()">Save Cookies</button>
+          <button class="btn btn-secondary" onclick="loadCookies()">Load Current</button>
+          <button class="btn btn-secondary" onclick="deleteCookies()">Delete Cookies</button>
+        </div>
       </div>
     </div>
   </div>

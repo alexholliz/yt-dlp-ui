@@ -2,17 +2,30 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const DB = require('./database');
 const YtDlpService = require('./ytdlp-service');
+const DownloadManager = require('./download-manager');
+const Scheduler = require('./scheduler');
 
 const app = express();
 const PORT = process.env.PORT || 8189;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/yt-dlp-ui.sqlite');
+const DOWNLOADS_PATH = process.env.DOWNLOADS_PATH || path.join(__dirname, '../downloads');
 const COOKIES_PATH = process.env.COOKIES_PATH || path.join(__dirname, '../config/cookies.txt');
 
-// Initialize database and yt-dlp service
+// Ensure directories exist
+[path.dirname(DB_PATH), DOWNLOADS_PATH, path.dirname(COOKIES_PATH)].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Initialize services
 const db = new DB(DB_PATH);
 const ytdlp = new YtDlpService(COOKIES_PATH);
+const downloadManager = new DownloadManager(db, ytdlp, DOWNLOADS_PATH);
+const scheduler = new Scheduler(db, downloadManager);
 
 // Wait for DB to initialize
 db.ready.then(() => {
@@ -63,17 +76,41 @@ db.ready.then(() => {
         return res.status(400).json({ error: 'URL is required' });
       }
 
+      // Detect URL type
+      const urlType = ytdlp.detectUrlType(url);
+      
+      let finalPlaylistMode = playlist_mode || 'enumerate';
+      let playlistsOnly = false;
+
+      // Handle different URL types
+      if (urlType === 'video') {
+        // Single video - add and download immediately
+        const result = await downloadManager.downloadSingleVideo(url, null);
+        return res.json({ type: 'video', video_id: result.video_id });
+      }
+
+      if (urlType === 'playlist') {
+        // Direct playlist URL - treat as a channel with one playlist
+        finalPlaylistMode = 'enumerate';
+      }
+
+      if (urlType === 'channel_playlists_only') {
+        // Channel /playlists URL - only download from playlists
+        finalPlaylistMode = 'enumerate';
+        playlistsOnly = true;
+      }
+
       // Add channel to database
       const channelId = db.addChannel(url, {
-        playlist_mode,
+        playlist_mode: finalPlaylistMode,
         flat_mode,
         auto_add_new_playlists,
         yt_dlp_options,
         rescrape_interval_days
       });
 
-      // Start enumeration in background (don't wait)
-      if (playlist_mode === 'enumerate') {
+      // Start enumeration in background
+      if (finalPlaylistMode === 'enumerate') {
         ytdlp.enumeratePlaylists(url)
           .then(result => {
             db.updateChannel(channelId, {
@@ -97,7 +134,7 @@ db.ready.then(() => {
           });
       }
 
-      res.json({ id: channelId, url });
+      res.json({ id: channelId, url, type: urlType, playlistsOnly });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -190,6 +227,137 @@ db.ready.then(() => {
     }
   });
 
+  // Download endpoints
+  
+  // Start downloading a playlist
+  app.post('/api/playlists/:id/download', async (req, res) => {
+    try {
+      const result = await downloadManager.downloadPlaylist(parseInt(req.params.id));
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Start downloading all enabled playlists for a channel
+  app.post('/api/channels/:id/download', async (req, res) => {
+    try {
+      const result = await downloadManager.downloadChannel(parseInt(req.params.id));
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Download a single video
+  app.post('/api/download/video', async (req, res) => {
+    try {
+      const { url, channelId } = req.body;
+      if (!url) {
+        return res.status(400).json({ error: 'URL is required' });
+      }
+      const result = await downloadManager.downloadSingleVideo(url, channelId || null);
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get download queue status
+  app.get('/api/download/status', (req, res) => {
+    try {
+      const status = downloadManager.getQueueStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Scheduler endpoints
+  
+  // Start scheduler
+  app.post('/api/scheduler/start', (req, res) => {
+    try {
+      const { intervalDays } = req.body;
+      scheduler.start(intervalDays || 7);
+      res.json({ success: true, message: 'Scheduler started' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Stop scheduler
+  app.post('/api/scheduler/stop', (req, res) => {
+    try {
+      scheduler.stop();
+      res.json({ success: true, message: 'Scheduler stopped' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get scheduler status
+  app.get('/api/scheduler/status', (req, res) => {
+    try {
+      const status = scheduler.getStatus();
+      res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Manually trigger a channel download
+  app.post('/api/scheduler/trigger/:channelId', async (req, res) => {
+    try {
+      await scheduler.triggerChannel(parseInt(req.params.channelId));
+      res.json({ success: true, message: 'Channel download triggered' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Cookie management
+  
+  // Get cookie file content
+  app.get('/api/cookies', (req, res) => {
+    try {
+      if (fs.existsSync(COOKIES_PATH)) {
+        const content = fs.readFileSync(COOKIES_PATH, 'utf8');
+        res.json({ exists: true, content });
+      } else {
+        res.json({ exists: false, content: '' });
+      }
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update cookie file
+  app.post('/api/cookies', (req, res) => {
+    try {
+      const { content } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: 'Content is required' });
+      }
+      fs.writeFileSync(COOKIES_PATH, content, 'utf8');
+      res.json({ success: true, message: 'Cookies saved successfully' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Delete cookie file
+  app.delete('/api/cookies', (req, res) => {
+    try {
+      if (fs.existsSync(COOKIES_PATH)) {
+        fs.unlinkSync(COOKIES_PATH);
+      }
+      res.json({ success: true, message: 'Cookies deleted' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Start server
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`yt-dlp-ui server running on port ${PORT}`);
@@ -199,13 +367,15 @@ db.ready.then(() => {
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing database...');
+    console.log('SIGTERM received, shutting down...');
+    scheduler.stop();
     db.close();
     process.exit(0);
   });
 
   process.on('SIGINT', () => {
-    console.log('SIGINT received, closing database...');
+    console.log('SIGINT received, shutting down...');
+    scheduler.stop();
     db.close();
     process.exit(0);
   });

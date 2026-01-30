@@ -7,8 +7,31 @@ class YtDlpService {
     this.cookiesPath = cookiesPath;
   }
 
+  detectUrlType(url) {
+    // Single video
+    if (url.includes('/watch?v=') || url.includes('youtu.be/')) {
+      return 'video';
+    }
+    // Playlist
+    if (url.includes('/playlist?list=')) {
+      return 'playlist';
+    }
+    // Channel with /playlists endpoint
+    if (url.includes('/playlists')) {
+      return 'channel_playlists_only';
+    }
+    // Regular channel
+    if (url.includes('/@') || url.includes('/channel/') || url.includes('/c/') || url.includes('/user/')) {
+      return 'channel';
+    }
+    return 'unknown';
+  }
+
   async enumeratePlaylists(channelUrl) {
     return new Promise((resolve, reject) => {
+      // Remove /playlists suffix if present
+      const cleanUrl = channelUrl.replace(/\/playlists\/?$/, '');
+      
       const args = [
         '--dump-json',
         '--flat-playlist',
@@ -19,7 +42,7 @@ class YtDlpService {
         args.push('--cookies', this.cookiesPath);
       }
 
-      args.push(channelUrl);
+      args.push(cleanUrl + '/playlists');
 
       const ytdlp = spawn('yt-dlp', args);
       let stdout = '';
@@ -119,7 +142,61 @@ class YtDlpService {
     });
   }
 
-  async download(url, options = {}) {
+  async enumeratePlaylistVideos(playlistUrl) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--dump-json',
+        '--flat-playlist',
+        '--skip-download'
+      ];
+
+      if (fs.existsSync(this.cookiesPath)) {
+        args.push('--cookies', this.cookiesPath);
+      }
+
+      args.push(playlistUrl);
+
+      const ytdlp = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      ytdlp.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      ytdlp.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytdlp.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(`yt-dlp failed: ${stderr}`));
+        }
+
+        try {
+          const lines = stdout.trim().split('\n').filter(line => line);
+          const videos = lines.map(line => {
+            const entry = JSON.parse(line);
+            return {
+              video_id: entry.id,
+              video_title: entry.title,
+              video_url: entry.url || `https://www.youtube.com/watch?v=${entry.id}`,
+              uploader: entry.uploader || entry.channel,
+              upload_date: entry.upload_date,
+              duration: entry.duration,
+              playlist_index: entry.playlist_index
+            };
+          });
+
+          resolve(videos);
+        } catch (err) {
+          reject(new Error(`Failed to parse playlist videos: ${err.message}`));
+        }
+      });
+    });
+  }
+
+  async download(url, options = {}, onProgress = null) {
     return new Promise((resolve, reject) => {
       const args = [];
 
@@ -163,17 +240,38 @@ class YtDlpService {
         args.push('--no-restrict-filenames');
       }
 
+      if (options.writeThumbnail) {
+        args.push('--write-thumbnail');
+      }
+
+      // Add progress output for parsing
+      args.push('--newline', '--progress');
+
       // Add custom options if provided
       if (options.customArgs) {
-        args.push(...options.customArgs.split(' '));
+        args.push(...options.customArgs.split(' ').filter(a => a));
       }
 
       args.push(url);
 
       const ytdlp = spawn('yt-dlp', args);
+      let lastProgress = {};
       
       ytdlp.stdout.on('data', (data) => {
-        console.log(data.toString());
+        const output = data.toString();
+        console.log(output);
+
+        // Parse progress
+        if (onProgress && output.includes('%')) {
+          const match = output.match(/(\d+\.?\d*)%/);
+          if (match) {
+            const percent = parseFloat(match[1]);
+            if (lastProgress.percent !== percent) {
+              lastProgress = { percent, time: Date.now() };
+              onProgress(lastProgress);
+            }
+          }
+        }
       });
 
       ytdlp.stderr.on('data', (data) => {
