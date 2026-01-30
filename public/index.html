@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>yt-dlp-ui</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎬 yt-dlp-ui</h1>
+      <p class="subtitle">Intelligent YouTube Download Manager</p>
+    </header>
+
+    <main>
+      <!-- Add Channel Section -->
+      <section class="card">
+        <h2>Add Channel</h2>
+        <form id="add-channel-form">
+          <div class="form-group">
+            <label for="channel-url">Channel URL</label>
+            <input 
+              type="text" 
+              id="channel-url" 
+              placeholder="https://www.youtube.com/@channelname"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="playlist-mode" checked>
+              Enumerate Playlists
+            </label>
+          </div>
+
+          <div class="form-group" id="playlist-options">
+            <label>
+              <input type="checkbox" id="auto-add-playlists">
+              Auto-enable new playlists
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="flat-mode">
+              Flat mode (download all videos to single folder)
+            </label>
+          </div>
+
+          <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="form-group">
+              <label for="yt-dlp-options">Custom yt-dlp options</label>
+              <textarea 
+                id="yt-dlp-options" 
+                placeholder="--format best --write-info-json"
+                rows="3"
+              ></textarea>
+              <small>Space-separated yt-dlp command line options</small>
+            </div>
+            <div class="form-group">
+              <label for="rescrape-days">Re-scrape interval (days)</label>
+              <input type="number" id="rescrape-days" value="7" min="1">
+            </div>
+          </details>
+
+          <button type="submit" class="btn btn-primary">Add Channel</button>
+        </form>
+      </section>
+
+      <!-- Channels List -->
+      <section class="card">
+        <h2>Channels</h2>
+        <div id="channels-list">
+          <p class="empty-state">No channels added yet. Add one above to get started!</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Channel Details Modal -->
+  <div id="channel-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Channel Details</h2>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- Content loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

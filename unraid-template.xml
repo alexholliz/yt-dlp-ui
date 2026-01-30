@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>yt-dlp-ui</Name>
+  <Repository>yt-dlp-ui:latest</Repository>
+  <Registry>https://ghcr.io/</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/yourusername/yt-dlp-ui</Support>
+  <Project>https://github.com/yourusername/yt-dlp-ui</Project>
+  <Overview>A self-hosted web UI for managing yt-dlp downloads with intelligent playlist handling. Automatically enumerate and organize playlists from YouTube channels with per-playlist download control.</Overview>
+  <Category>Downloaders: MediaApp:Video</Category>
+  <WebUI>http://[IP]:[PORT:8189]</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/yourusername/yt-dlp-ui/main/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8189" Default="8189" Mode="tcp" Description="Port for web interface" Type="Port" Display="always" Required="true" Mask="false">8189</Config>
+  <Config Name="Config Directory" Target="/config" Default="/mnt/user/appdata/yt-dlp-ui" Mode="rw" Description="Directory for app configuration and database" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/yt-dlp-ui</Config>
+  <Config Name="Downloads Directory" Target="/downloads" Default="/mnt/user/downloads/youtube" Mode="rw" Description="Directory where videos will be downloaded" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/downloads/youtube</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/New_York" Mode="" Description="Timezone (IANA format)" Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
+  <Config Name="Database Path" Target="DB_PATH" Default="/config/yt-dlp-ui.sqlite" Mode="" Description="Path to SQLite database file" Type="Variable" Display="advanced" Required="false" Mask="false">/config/yt-dlp-ui.sqlite</Config>
+  <Config Name="Downloads Path" Target="DOWNLOADS_PATH" Default="/downloads" Mode="" Description="Container path for downloads" Type="Variable" Display="advanced" Required="false" Mask="false">/downloads</Config>
+  <Config Name="Cookies Path" Target="COOKIES_PATH" Default="/config/cookies.txt" Mode="" Description="Path to YouTube cookies file" Type="Variable" Display="advanced" Required="false" Mask="false">/config/cookies.txt</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+</Container>

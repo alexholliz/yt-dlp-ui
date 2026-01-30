@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  yt-dlp-ui:
+    build: .
+    container_name: yt-dlp-ui
+    ports:
+      - "8189:8189"
+    volumes:
+      - ./config:/config
+      - ./downloads:/downloads
+    environment:
+      - TZ=America/New_York
+      - PORT=8189
+      - DB_PATH=/config/yt-dlp-ui.sqlite
+      - DOWNLOADS_PATH=/downloads
+      - COOKIES_PATH=/config/cookies.txt
+    restart: unless-stopped

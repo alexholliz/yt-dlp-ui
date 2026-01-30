@@ -1,0 +1,22 @@
+{
+  "name": "yt-dlp-ui",
+  "version": "0.1.0",
+  "description": "A self-hosted web UI for managing yt-dlp downloads with intelligent playlist handling",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": ["yt-dlp", "youtube", "downloader", "docker"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^9.2.2",
+    "body-parser": "^1.20.2",
+    "cookie-parser": "^1.4.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
