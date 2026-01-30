@@ -244,6 +244,53 @@ db.ready.then(() => {
     }
   });
 
+  // Stats endpoints
+  
+  // Get overall statistics
+  app.get('/api/stats', (req, res) => {
+    try {
+      const stats = db.getStats();
+      res.json(stats);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get recent downloads with pagination
+  app.get('/api/downloads/recent', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 5;
+      const offset = parseInt(req.query.offset) || 0;
+      const downloads = db.getRecentDownloads(limit, offset);
+      res.json(downloads);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get channel statistics
+  app.get('/api/stats/channels', (req, res) => {
+    try {
+      const channelStats = db.getChannelStats();
+      res.json(channelStats);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get video by ID (for metadata page)
+  app.get('/api/videos/:videoId', (req, res) => {
+    try {
+      const video = db.getVideo(req.params.videoId);
+      if (!video) {
+        return res.status(404).json({ error: 'Video not found' });
+      }
+      res.json(video);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Download endpoints
   
   // Start downloading a playlist

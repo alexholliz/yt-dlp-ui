@@ -252,6 +252,18 @@ class DB {
     return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
+  getVideo(videoId) {
+    const result = this.db.exec(`
+      SELECT v.*, c.channel_name, p.playlist_title
+      FROM videos v
+      LEFT JOIN channels c ON v.channel_id = c.id
+      LEFT JOIN playlists p ON v.playlist_id = p.id
+      WHERE v.video_id = ?
+    `, [videoId]);
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return this.rowToObject(result[0].columns, result[0].values[0]);
+  }
+
   updateVideoStatus(videoId, status, filePath = null, downloadedAt = null) {
     this.db.run(`
       UPDATE videos 
@@ -259,6 +271,53 @@ class DB {
       WHERE video_id = ?
     `, [status, filePath, downloadedAt, videoId]);
     this.save();
+  }
+
+  // Statistics
+  getStats() {
+    const channelCount = this.db.exec('SELECT COUNT(*) as count FROM channels');
+    const totalDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'completed'");
+    const pendingDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'pending'");
+    
+    return {
+      channel_count: channelCount[0]?.values[0]?.[0] || 0,
+      total_downloads: totalDownloads[0]?.values[0]?.[0] || 0,
+      pending_downloads: pendingDownloads[0]?.values[0]?.[0] || 0,
+      library_size: 0 // Will be calculated from file system
+    };
+  }
+
+  getRecentDownloads(limit = 5, offset = 0) {
+    const result = this.db.exec(`
+      SELECT v.*, c.channel_name 
+      FROM videos v
+      LEFT JOIN channels c ON v.channel_id = c.id
+      WHERE v.download_status = 'completed'
+      ORDER BY v.downloaded_at DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+    
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
+  }
+
+  getChannelStats() {
+    const result = this.db.exec(`
+      SELECT 
+        c.id,
+        c.channel_name,
+        c.url,
+        c.playlist_mode,
+        COUNT(CASE WHEN v.download_status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN v.download_status = 'completed' THEN 1 END) as completed_count
+      FROM channels c
+      LEFT JOIN videos v ON c.id = v.channel_id
+      GROUP BY c.id
+      ORDER BY c.channel_name
+    `);
+    
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   rowToObject(columns, values) {
