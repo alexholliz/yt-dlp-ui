@@ -10,9 +10,14 @@ services:
       - ./config:/config
       - ./downloads:/downloads
     environment:
-      - TZ=America/New_York
+      - TZ=UTC
       - PORT=8189
       - DB_PATH=/config/yt-dlp-ui.sqlite
       - DOWNLOADS_PATH=/downloads
       - COOKIES_PATH=/config/cookies.txt
+      - LOG_LEVEL=debug
+      - YT_DL_WORKER_CONCURRENCY=2
+      # Uncomment to enable basic auth:
+      # - BASIC_AUTH_USERNAME=admin
+      # - BASIC_AUTH_PASSWORD=changeme
     restart: unless-stopped

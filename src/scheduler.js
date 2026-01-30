@@ -1,3 +1,5 @@
+const logger = require('./logger');
+
 class Scheduler {
   constructor(db, downloadManager) {
     this.db = db;
@@ -14,7 +16,7 @@ class Scheduler {
     // Convert days to milliseconds
     const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
 
-    console.log(`Starting scheduler with ${intervalDays} day interval`);
+    logger.info(`Starting scheduler with ${intervalDays} day interval`);
 
     // Run immediately on start
     this.checkAndDownload();
@@ -33,7 +35,7 @@ class Scheduler {
   }
 
   async checkAndDownload() {
-    console.log('Scheduler: Checking for new content...');
+    logger.info('Scheduler: Checking for new content...');
     
     const channels = this.db.getAllChannels();
     const now = Math.floor(Date.now() / 1000);
@@ -43,20 +45,20 @@ class Scheduler {
         (now - channel.last_scraped_at) >= (channel.rescrape_interval_days * 24 * 60 * 60);
 
       if (shouldRescrape) {
-        console.log(`Scheduler: Processing channel ${channel.id} - ${channel.channel_name || channel.url}`);
+        logger.info(`Scheduler: Processing channel ${channel.id} - ${channel.channel_name || channel.url}`);
         
         try {
           // Download from channel
           await this.downloadManager.downloadChannel(channel.id);
         } catch (err) {
-          console.error(`Scheduler: Failed to process channel ${channel.id}:`, err.message);
+          logger.error(`Scheduler: Failed to process channel ${channel.id}:`, err.message);
         }
       }
     }
   }
 
   async triggerChannel(channelId) {
-    console.log(`Manually triggering channel ${channelId}`);
+    logger.info(`Manually triggering channel ${channelId}`);
     await this.downloadManager.downloadChannel(channelId);
   }
 

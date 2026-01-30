@@ -24,6 +24,14 @@ class DB {
       this.db = new SQL.Database();
     }
     
+    // Enable WAL mode for better concurrency
+    try {
+      this.db.run('PRAGMA journal_mode=WAL;');
+      console.log('SQLite WAL mode enabled');
+    } catch (err) {
+      console.warn('Could not enable WAL mode:', err.message);
+    }
+    
     this.initTables();
     this.save();
   }

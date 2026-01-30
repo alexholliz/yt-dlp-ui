@@ -1,4 +1,5 @@
 const path = require('path');
+const logger = require('./logger');
 
 class DownloadManager {
   constructor(db, ytdlp, downloadsPath) {
@@ -8,15 +9,31 @@ class DownloadManager {
     this.activeDownloads = new Map(); // video_id -> download info
     this.queue = [];
     this.isProcessing = false;
+    this.concurrency = parseInt(process.env.YT_DL_WORKER_CONCURRENCY || '2');
   }
 
   async startDownloads() {
+    if (this.isProcessing) return;
+    
     this.isProcessing = true;
+    
+    // Start multiple workers based on concurrency
+    const workers = [];
+    for (let i = 0; i < this.concurrency; i++) {
+      workers.push(this.worker());
+    }
+    
+    await Promise.all(workers);
+    this.isProcessing = false;
+  }
+
+  async worker() {
     while (this.queue.length > 0) {
       const task = this.queue.shift();
-      await this.processDownload(task);
+      if (task) {
+        await this.processDownload(task);
+      }
     }
-    this.isProcessing = false;
   }
 
   async processDownload(task) {
@@ -41,9 +58,9 @@ class DownloadManager {
       this.db.updateVideoStatus(videoId, 'completed', null, downloadedAt);
       this.activeDownloads.delete(videoId);
 
-      console.log(`✓ Downloaded: ${videoId}`);
+      logger.info(`✓ Downloaded: ${videoId}`);
     } catch (err) {
-      console.error(`✗ Failed to download ${videoId}:`, err.message);
+      logger.error(`✗ Failed to download ${videoId}:`, err.message);
       this.db.updateVideoStatus(videoId, 'failed');
       this.activeDownloads.delete(videoId);
     }
@@ -61,7 +78,7 @@ class DownloadManager {
     }
 
     // Enumerate videos in playlist
-    console.log(`Enumerating videos in playlist: ${playlist.playlist_title}`);
+    logger.info(`Enumerating videos in playlist: ${playlist.playlist_title}`);
     const videos = await this.ytdlp.enumeratePlaylistVideos(playlist.playlist_url);
 
     // Add videos to database

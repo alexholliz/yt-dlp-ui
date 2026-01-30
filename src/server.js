@@ -1,18 +1,22 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const basicAuth = require('express-basic-auth');
 const path = require('path');
 const fs = require('fs');
 const DB = require('./database');
 const YtDlpService = require('./ytdlp-service');
 const DownloadManager = require('./download-manager');
 const Scheduler = require('./scheduler');
+const logger = require('./logger');
 
 const app = express();
 const PORT = process.env.PORT || 8189;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/yt-dlp-ui.sqlite');
 const DOWNLOADS_PATH = process.env.DOWNLOADS_PATH || path.join(__dirname, '../downloads');
 const COOKIES_PATH = process.env.COOKIES_PATH || path.join(__dirname, '../config/cookies.txt');
+const BASIC_AUTH_USERNAME = process.env.BASIC_AUTH_USERNAME;
+const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD;
 
 // Ensure directories exist
 [path.dirname(DB_PATH), DOWNLOADS_PATH, path.dirname(COOKIES_PATH)].forEach(dir => {
@@ -29,12 +33,25 @@ const scheduler = new Scheduler(db, downloadManager);
 
 // Wait for DB to initialize
 db.ready.then(() => {
-  console.log('Database ready');
+  logger.info('Database ready');
   
   // Middleware
   app.use(bodyParser.json());
   app.use(bodyParser.urlencoded({ extended: true }));
   app.use(cookieParser());
+
+  // Basic Auth (if configured)
+  if (BASIC_AUTH_USERNAME && BASIC_AUTH_PASSWORD) {
+    logger.info('Basic authentication enabled');
+    app.use(basicAuth({
+      users: { [BASIC_AUTH_USERNAME]: BASIC_AUTH_PASSWORD },
+      challenge: true,
+      realm: 'yt-dlp-ui'
+    }));
+  } else {
+    logger.warn('Basic authentication is disabled - anyone can access the UI');
+  }
+
   app.use(express.static(path.join(__dirname, '../public')));
 
   // Routes
@@ -127,10 +144,10 @@ db.ready.then(() => {
               });
             });
 
-            console.log(`Enumerated ${result.playlists.length} playlists for channel ${channelId}`);
+            logger.info(`Enumerated ${result.playlists.length} playlists for channel ${channelId}`);
           })
           .catch(err => {
-            console.error(`Failed to enumerate playlists for channel ${channelId}:`, err);
+            logger.error(`Failed to enumerate playlists for channel ${channelId}:`, err);
           });
       }
 
@@ -360,21 +377,21 @@ db.ready.then(() => {
 
   // Start server
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`yt-dlp-ui server running on port ${PORT}`);
-    console.log(`Database: ${DB_PATH}`);
-    console.log(`Cookies: ${COOKIES_PATH}`);
+    logger.info(`yt-dlp-ui server running on port ${PORT}`);
+    logger.info(`Database: ${DB_PATH}`);
+    logger.info(`Cookies: ${COOKIES_PATH}`);
   });
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down...');
+    logger.info('SIGTERM received, shutting down...');
     scheduler.stop();
     db.close();
     process.exit(0);
   });
 
   process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down...');
+    logger.info('SIGINT received, shutting down...');
     scheduler.stop();
     db.close();
     process.exit(0);
