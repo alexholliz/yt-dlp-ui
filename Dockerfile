@@ -22,14 +22,15 @@ COPY public/ ./public/
 # Create necessary directories
 RUN mkdir -p /config /downloads
 
-# Environment variables
+# Environment variables with defaults
+ARG PORT=8189
 ENV NODE_ENV=production \
-    PORT=8189 \
+    PORT=${PORT} \
     DB_PATH=/config/yt-dlp-ui.sqlite \
     DOWNLOADS_PATH=/downloads \
     COOKIES_PATH=/config/cookies.txt \
     TZ=UTC
 
-EXPOSE 8189
+EXPOSE ${PORT}
 
 CMD ["node", "src/server.js"]
