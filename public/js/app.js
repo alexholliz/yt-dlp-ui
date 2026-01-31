@@ -451,8 +451,14 @@ async function loadCookies() {
   try {
     const result = await api.get('/api/cookies');
     document.getElementById('cookies-content').value = result.content || '';
+    if (result.exists) {
+      showNotification('Cookies loaded successfully', 'success');
+    } else {
+      showNotification('No cookies file found', 'info');
+    }
   } catch (err) {
     console.error('Failed to load cookies:', err);
+    showNotification('Failed to load cookies: ' + err.message, 'error');
   }
 }
 
