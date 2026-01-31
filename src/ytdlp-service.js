@@ -29,8 +29,8 @@ class YtDlpService {
 
   async enumeratePlaylists(channelUrl) {
     return new Promise((resolve, reject) => {
-      // Remove /playlists suffix if present
-      const cleanUrl = channelUrl.replace(/\/playlists\/?$/, '');
+      // Remove /playlists suffix if present, and also remove trailing slash
+      const cleanUrl = channelUrl.replace(/\/playlists\/?$/, '').replace(/\/$/, '');
       
       const args = [
         '--dump-json',
@@ -43,7 +43,7 @@ class YtDlpService {
         args.push('--cookies', this.cookiesPath);
       }
 
-      // For channels, we need to get the /videos tab and extract playlists from there
+      // For channels, we need to get the /playlists tab
       args.push(cleanUrl + '/playlists');
 
       const ytdlp = spawn('yt-dlp', args);
@@ -80,9 +80,9 @@ class YtDlpService {
 
           entries.forEach(entry => {
             // Get channel info from first entry
-            if (entry.channel_id && !channelInfo.channel_id) {
-              channelInfo.channel_id = entry.channel_id;
-              channelInfo.channel_name = entry.channel || entry.uploader || entry.uploader_id;
+            if (!channelInfo.channel_id) {
+              channelInfo.channel_id = entry.channel_id || entry.playlist_channel_id;
+              channelInfo.channel_name = entry.channel || entry.uploader || entry.playlist_uploader || entry.uploader_id;
             }
 
             // Each entry in /playlists is itself a playlist
