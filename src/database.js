@@ -66,6 +66,7 @@ class DB {
         playlist_id TEXT NOT NULL,
         playlist_title TEXT,
         playlist_url TEXT,
+        video_count INTEGER DEFAULT 0,
         enabled BOOLEAN DEFAULT 0,
         last_scraped_at INTEGER,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
@@ -181,17 +182,19 @@ class DB {
   // Playlists
   addPlaylist(channelId, playlistData) {
     this.db.run(`
-      INSERT INTO playlists (channel_id, playlist_id, playlist_title, playlist_url, enabled)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO playlists (channel_id, playlist_id, playlist_title, playlist_url, video_count, enabled)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(channel_id, playlist_id) DO UPDATE SET
         playlist_title = excluded.playlist_title,
         playlist_url = excluded.playlist_url,
+        video_count = excluded.video_count,
         updated_at = strftime('%s', 'now')
     `, [
       channelId,
       playlistData.playlist_id,
       playlistData.playlist_title,
       playlistData.playlist_url,
+      playlistData.video_count || 0,
       playlistData.enabled ? 1 : 0
     ]);
     this.save();

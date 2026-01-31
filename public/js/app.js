@@ -233,6 +233,7 @@ async function viewChannel(channelId) {
         <div class="playlist-item">
           <div class="playlist-info">
             <h4>${escapeHtml(p.playlist_title)}</h4>
+            <small style="color: var(--text-muted);">${p.video_count || 0} video${(p.video_count || 0) !== 1 ? 's' : ''}</small>
           </div>
           <div class="playlist-actions">
             <label class="toggle-switch">
