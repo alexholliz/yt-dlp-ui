@@ -75,6 +75,44 @@ After you push the pipeline to GitHub, complete these steps:
 - [ ] **Update Unraid Template** (if applicable)
   - Change `Repository` to: `ghcr.io/<username>/yt-dlp-ui:latest`
 
+## Known Issues & Workarounds
+
+### ARM64 Build Disabled (2026-01-31)
+
+**Issue**: Multi-architecture builds fail on ARM64 with QEMU emulation error:
+```
+qemu: uncaught target signal 4 (Illegal instruction) - core dumped
+```
+
+**Root Cause**: Node.js Alpine images have known incompatibilities with QEMU emulation used by Docker Buildx for cross-platform builds.
+
+**Current Solution**: Build AMD64 only (covers 95%+ of users)
+- Modified `.github/workflows/build-and-test.yml` line 84
+- Changed from: `platforms: linux/amd64,linux/arm64`
+- Changed to: `platforms: linux/amd64`
+
+**Future Options**:
+1. **Switch to Debian-based Node image** (e.g., `node:20-slim`)
+   - Pros: Better QEMU compatibility
+   - Cons: Larger image size (~150MB vs ~50MB)
+   
+2. **Use native ARM64 runners** (GitHub hosted or self-hosted)
+   - Pros: No QEMU emulation issues
+   - Cons: Costs money, more complex setup
+   
+3. **Use Docker buildx with --provenance=false**
+   - Sometimes helps with QEMU issues
+   - May not fully resolve the problem
+   
+4. **Keep ARM64 disabled**
+   - Most users are on AMD64 (x86_64)
+   - ARM64 users can build locally if needed
+
+**Affected Users**: Raspberry Pi, Apple Silicon (M1/M2/M3), ARM-based servers
+**Workaround for ARM64 users**: Build locally with `docker-compose build`
+
+---
+
 ## Future Enhancements
 
 - [ ] Add real unit tests (replace placeholders)
