@@ -235,7 +235,7 @@ async function viewChannel(channelId) {
   const modal = document.getElementById('channel-modal');
   const modalBody = document.getElementById('channel-modal-body');
   
-  modalBody.innerHTML = '<p class="loading">Loading playlists...</p>';
+  modalBody.innerHTML = '<p class="loading">Loading channel details...</p>';
   modal.style.display = 'flex';
   
   try {
@@ -244,39 +244,73 @@ async function viewChannel(channelId) {
     
     document.getElementById('modal-channel-name').textContent = channel.channel_name || 'Channel';
     
-    if (playlists.length === 0) {
-      modalBody.innerHTML = `
-        <div class="empty-state">
-          <p>No playlists found.</p>
-          <button class="btn btn-primary" onclick="enumeratePlaylists(${channelId})">Enumerate Now</button>
-        </div>
-      `;
-      return;
-    }
-    
     modalBody.innerHTML = `
-      <div class="box-header">
-        <h3>Playlists (${playlists.length})</h3>
-        <div class="button-group">
-          <button class="btn btn-secondary btn-small" onclick="enumeratePlaylists(${channelId})">Refresh</button>
-          <button class="btn btn-primary btn-small" onclick="downloadChannel(${channelId})">Download All</button>
-        </div>
+      <!-- Channel Settings -->
+      <div class="content-box" style="margin-bottom: 1rem;">
+        <h3>Channel Settings</h3>
+        <form id="edit-channel-form-${channelId}" onsubmit="saveChannelSettings(${channelId}, event); return false;">
+          <div class="form-group">
+            <label>Channel URL</label>
+            <input type="text" value="${escapeHtml(channel.url)}" disabled style="background: var(--surface-hover); cursor: not-allowed;">
+            <small>URL cannot be changed after adding</small>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="edit-playlist-mode-${channelId}" ${channel.playlist_mode === 'enumerate' ? 'checked' : ''}> Enumerate Playlists</label>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="edit-auto-add-${channelId}" ${channel.auto_add_new_playlists ? 'checked' : ''}> Auto-enable new playlists</label>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="edit-flat-mode-${channelId}" ${channel.flat_mode ? 'checked' : ''}> Flat mode (single folder)</label>
+          </div>
+          <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="form-group">
+              <label for="edit-yt-dlp-options-${channelId}">Custom yt-dlp options</label>
+              <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="--format best">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
+              <small>Do NOT include -o, --merge-output-format, or --write-info-json (handled automatically)</small>
+            </div>
+            <div class="form-group">
+              <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>
+              <input type="number" id="edit-rescrape-days-${channelId}" value="${channel.rescrape_interval_days || 7}" min="1">
+            </div>
+          </details>
+          <button type="submit" class="btn btn-primary">Save Settings</button>
+        </form>
       </div>
-      ${playlists.map(p => `
-        <div class="playlist-item">
-          <div class="playlist-info">
-            <h4>${escapeHtml(p.playlist_title)}</h4>
-            <small style="color: var(--text-muted);">${p.video_count || 0} video${(p.video_count || 0) !== 1 ? 's' : ''}</small>
+
+      <!-- Playlists -->
+      <div class="content-box">
+        ${playlists.length === 0 ? `
+          <div class="empty-state">
+            <p>No playlists found.</p>
+            <button class="btn btn-primary" onclick="enumeratePlaylists(${channelId})">Enumerate Now</button>
           </div>
-          <div class="playlist-actions">
-            <label class="toggle-switch">
-              <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlaylist(${p.id}, this.checked)">
-              <span class="slider"></span>
-            </label>
-            <button class="btn btn-primary btn-small" onclick="downloadPlaylist(${p.id})">Download</button>
+        ` : `
+          <div class="box-header">
+            <h3>Playlists (${playlists.length})</h3>
+            <div class="button-group">
+              <button class="btn btn-secondary btn-small" onclick="enumeratePlaylists(${channelId})">Refresh</button>
+              <button class="btn btn-primary btn-small" onclick="downloadChannel(${channelId})">Download All</button>
+            </div>
           </div>
-        </div>
-      `).join('')}
+          ${playlists.map(p => `
+            <div class="playlist-item">
+              <div class="playlist-info">
+                <h4>${escapeHtml(p.playlist_title)}</h4>
+                <small style="color: var(--text-muted);">${p.video_count || 0} video${(p.video_count || 0) !== 1 ? 's' : ''}</small>
+              </div>
+              <div class="playlist-actions">
+                <label class="toggle-switch">
+                  <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlaylist(${p.id}, this.checked)">
+                  <span class="slider"></span>
+                </label>
+                <button class="btn btn-primary btn-small" onclick="downloadPlaylist(${p.id})">Download</button>
+              </div>
+            </div>
+          `).join('')}
+        `}
+      </div>
     `;
   } catch (err) {
     showNotification('Failed to load channel: ' + err.message, 'error');
@@ -379,6 +413,31 @@ async function enumeratePlaylists(channelId) {
     showNotification('Playlists enumerated!', 'success');
   } catch (err) {
     showNotification('Failed: ' + err.message, 'error');
+  }
+}
+
+async function saveChannelSettings(channelId, e) {
+  e.preventDefault();
+  
+  const playlistMode = document.getElementById(`edit-playlist-mode-${channelId}`).checked;
+  const autoAdd = document.getElementById(`edit-auto-add-${channelId}`).checked;
+  const flatMode = document.getElementById(`edit-flat-mode-${channelId}`).checked;
+  const ytDlpOptions = document.getElementById(`edit-yt-dlp-options-${channelId}`).value.trim();
+  const rescrapeDays = parseInt(document.getElementById(`edit-rescrape-days-${channelId}`).value);
+  
+  try {
+    await api.put(`/api/channels/${channelId}`, {
+      playlist_mode: playlistMode ? 'enumerate' : 'flat',
+      flat_mode: flatMode,
+      auto_add_new_playlists: autoAdd,
+      yt_dlp_options: ytDlpOptions || null,
+      rescrape_interval_days: rescrapeDays
+    });
+    
+    showNotification('Channel settings saved!', 'success');
+    loadChannelsPage(); // Refresh channels table
+  } catch (err) {
+    showNotification('Failed to save: ' + err.message, 'error');
   }
 }
 
