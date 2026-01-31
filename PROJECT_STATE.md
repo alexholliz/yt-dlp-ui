@@ -806,48 +806,68 @@ open http://localhost:8189
    - Apply format selection from profile
    - Test end-to-end with channel downloads
 
-2. **Additional Profile Presets**
+2. **YouTube Authentication & Cookie Management**
+   - Cookie generation with YouTube login or API integration
+   - Handles age-restricted and members-only content
+   - Automatic cookie refresh/renewal
+   - Cookie validation and expiry warnings
+   - Solves "Sign in to confirm you're not a bot" issues
+
+3. **Channel Non-Playlist Video Downloads**
+   - New mode for channels to download videos not in any playlist
+   - "All Videos" tab/mode alongside playlists
+   - Handles shorts, community posts, live streams
+   - Optional: separate enable/disable toggle from playlists
+
+4. **Multi-Site Support (Beyond YouTube)**
+   - Support for non-YouTube sites (leveraging yt-dlp's 1000+ extractors)
+   - Site-specific configuration profiles
+   - URL validation for supported sites
+   - Custom metadata extraction per site
+   - Examples: Vimeo, Twitch, Twitter/X, Instagram, etc.
+
+5. **Additional Profile Presets**
    - "720p Space Saver" preset
    - "Max Quality" preset
    - "Audio Only" preset
 
-3. **Video Thumbnails**
+6. **Video Thumbnails**
    - Display in history table
    - Show in video metadata modal  
    - Lazy load for performance
 
-4. **Advanced Filtering**
+7. **Advanced Filtering**
    - Filter videos by channel, playlist, or status
    - Search videos by title
    - Date range filtering
 
-5. **Batch Channel Management**
+8. **Batch Channel Management**
    - Import channels from text file
    - Export channel list
    - Bulk enable/disable channels
 
-6. **Download Statistics**
+9. **Download Statistics**
    - Charts for download history
    - Bandwidth usage tracking
    - Success/failure rates
 
-7. **Mobile Responsive UI**
-   - Optimize sidebar for mobile
-   - Touch-friendly controls
-   - Responsive tables
+10. **Mobile Responsive UI**
+    - Optimize sidebar for mobile
+    - Touch-friendly controls
+    - Responsive tables
 
-5. **Search & Filtering**
-   - Search videos by title
-   - Filter by channel
-   - Date range filters
+11. **Search & Filtering**
+    - Search videos by title
+    - Filter by channel
+    - Date range filters
 
-6. **Notifications**
-   - Discord webhook
-   - Telegram bot
-   - Email alerts
-   - Download completion notifications
+12. **Notifications**
+    - Discord webhook
+    - Telegram bot
+    - Email alerts
+    - Download completion notifications
 
-7. **Advanced Scheduling**
+13. **Advanced Scheduling**
    - Per-channel schedules
    - Time-of-day preferences
    - Bandwidth limiting
