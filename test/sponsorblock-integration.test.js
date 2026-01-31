@@ -98,7 +98,7 @@ function runYtDlp(args) {
           success: false,
           videoInfo: null,
           stderr,
-          error: `Failed to parse JSON: ${err.message}`
+          error: `Failed to parse JSON: ${err.message}\nSTDOUT: ${stdout.substring(0, 500)}\nSTDERR: ${stderr.substring(0, 500)}`
         });
       }
     });
