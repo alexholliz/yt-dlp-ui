@@ -4,6 +4,18 @@
 **Version:** 1.0.0-beta  
 **Status:** Fully Functional
 
+> **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
+> This document MUST be kept up-to-date as development continues.  
+> When making changes to the project, update the relevant sections:
+> - Add new features to "Implemented Features"
+> - Update "Recent Changes" with latest commits
+> - Document new technical decisions in "Key Technical Decisions"
+> - Add new known issues to "Known Issues & Limitations"
+> - Move completed roadmap items to "Implemented Features"
+> - Update the "Last Updated" date at the top
+> 
+> This ensures continuity for future AI sessions and human developers.
+
 ---
 
 ## Current State of the Project
@@ -236,6 +248,7 @@ This is a functional YouTube download manager built with Node.js, Express, and S
    - Update CSS in public/css/styles.css if needed
    - Test with curl before UI testing
    - Commit frequently with descriptive messages
+   - **UPDATE PROJECT_STATE.md** with new features and changes
 
 8. **Unraid Deployment**:
    - Template is in `unraid-template.xml`
@@ -485,12 +498,15 @@ open http://localhost:8189
 ### Recent Changes (Last 5 Commits)
 
 ```
+e1ecd29 Add database migration for video_count column
+f60f08d Add comprehensive project state and continuation guide
 58206da Add video count display for playlists
 38bc885 Fix playlist enumeration and add channel name fallback
 36e8206 Add auto-refresh when adding channels
-8a0ca21 Add enumeration progress indicators to Channels page
-85a719e Major UI redesign: Sidebar layout with Home, Channels, Config pages
 ```
+
+> **Note**: When continuing development, update this section with latest commits using:  
+> `git log --oneline -5`
 
 ---
 
@@ -552,11 +568,12 @@ open http://localhost:8189
 
 ### Known Bugs to Fix
 
-1. Channel name not always captured during enumeration
+1. ~~Channel name not always captured during enumeration~~ (Fixed with URL fallback)
 2. Library size shows 0 (not implemented)
-3. Queue table shows video IDs instead of titles
+3. Queue table shows video IDs instead of titles (need to join with videos table)
 4. No error handling for failed downloads in UI
 5. Modal backdrop click sometimes doesn't close on first click
+6. ~~Video count not showing in playlists~~ (Fixed with migration and proper enumeration)
 
 ### Performance Optimizations Needed
 
