@@ -1,5 +1,24 @@
 # Testing Strategy & Checklist
 
+> **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
+> This file contains testing strategy, test patterns, and guidelines for adding new tests.
+> 
+> **When to Update This File:**
+> - After adding new test files or test cases
+> - When changing testing strategy or approach
+> - After discovering new testing patterns or best practices
+> - When updating test infrastructure (Docker, CI, etc.)
+> - After researching external testing methodologies
+> - When test coverage goals change
+> 
+> **Related Files:**
+> - `PROJECT_STATE.md` - Overall project state and feature history
+> - `CI_CD_CHECKLIST.md` - CI/CD pipeline configuration
+> - `test/` directory - All test files
+> - `.github/workflows/build-and-test.yml` - Test execution in CI
+
+---
+
 ## Overview
 
 This project follows **yt-dlp's battle-tested two-tier testing approach**: comprehensive unit tests for logic validation, and optional integration tests for end-to-end verification.

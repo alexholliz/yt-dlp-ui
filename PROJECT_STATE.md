@@ -5,14 +5,27 @@
 **Status:** Production-Ready with Comprehensive Documentation
 
 > **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
-> This document MUST be kept up-to-date as development continues.  
-> When making changes to the project, update the relevant sections:
-> - Add new features to "Implemented Features"
-> - Update "Recent Changes" with latest commits
-> - Document new technical decisions in "Key Technical Decisions"
-> - Add new known issues to "Known Issues & Limitations"
-> - Move completed roadmap items to "Implemented Features"
-> - Update the "Last Updated" date at the top
+> 
+> **Read These Files at Session Start:**
+> 1. **PROJECT_STATE.md** (this file) - Project history, architecture, current status
+> 2. **TESTING_CHECKLIST.md** - Testing strategy, how to add tests
+> 3. **CI_CD_CHECKLIST.md** - Pipeline status, deployment checklist
+> 4. **README.md** - Project overview and quick start
+> 
+> **Keep These Files Updated During Your Session:**
+> 
+> | File | What to Update | When to Update |
+> |------|---------------|----------------|
+> | **PROJECT_STATE.md** | Features, architecture, technical decisions, project history | After implementing features, fixing bugs, or making architectural changes |
+> | **TESTING_CHECKLIST.md** | Test coverage, new test patterns, testing decisions | When adding/modifying tests, changing test strategy |
+> | **CI_CD_CHECKLIST.md** | Pipeline changes, deployment steps, CI/CD configuration | When modifying workflows, Docker builds, or deployment process |
+> | **README.md** | Installation steps, feature list, quick start | When adding major features or changing setup |
+> 
+> **At End of Session:**
+> - Update "Last Updated" date at top of this file
+> - Add session summary to "Latest Session Changes"
+> - Update version number if appropriate (major/minor/patch)
+> - Commit all documentation updates with code changes
 > 
 > **Git Configuration for this Repository:**
 > - Git user name: `alexholliz`

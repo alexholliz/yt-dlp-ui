@@ -1,5 +1,24 @@
 # CI/CD Pipeline - Post-Push Checklist
 
+> **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
+> This file contains CI/CD pipeline status, deployment checklist, and workflow configuration.
+> 
+> **When to Update This File:**
+> - After modifying `.github/workflows/*.yml` files
+> - When changing Docker build process or Dockerfile
+> - After updating deployment steps or procedures
+> - When adding/removing CI checks or test requirements
+> - After troubleshooting pipeline issues
+> - When updating container registry settings
+> 
+> **Related Files:**
+> - `PROJECT_STATE.md` - Overall project state and feature history
+> - `TESTING_CHECKLIST.md` - Testing strategy and test development  
+> - [CI/CD Guide (Wiki)](https://github.com/alexholliz/yt-dlp-ui/wiki/CI-CD-Guide) - Detailed setup instructions
+> - [Pipeline Setup (Wiki)](https://github.com/alexholliz/yt-dlp-ui/wiki/Pipeline-Setup) - Quick reference
+
+---
+
 After you push the pipeline to GitHub, complete these steps:
 
 ## Immediate (First 30 minutes)
