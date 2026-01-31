@@ -303,6 +303,76 @@ class YtDlpService {
       });
     });
   }
+
+  async testCookies(testVideoUrl) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--dump-json',
+        '--skip-download'
+      ];
+
+      if (fs.existsSync(this.cookiesPath)) {
+        args.push('--cookies', this.cookiesPath);
+      } else {
+        return resolve({ 
+          valid: false, 
+          error: 'No cookies file found' 
+        });
+      }
+
+      args.push(testVideoUrl);
+
+      const ytdlp = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      ytdlp.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      ytdlp.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytdlp.on('close', (code) => {
+        if (code === 0) {
+          try {
+            // If we can parse video info, cookies work
+            JSON.parse(stdout);
+            resolve({ 
+              valid: true, 
+              message: 'Cookies are valid and working with YouTube' 
+            });
+          } catch (err) {
+            resolve({ 
+              valid: false, 
+              error: 'Could not parse video information' 
+            });
+          }
+        } else {
+          // Check for specific error messages
+          const errorMsg = stderr.toLowerCase();
+          let error = 'Cookie validation failed';
+          
+          if (errorMsg.includes('sign in to confirm your age') || 
+              errorMsg.includes('age-restricted')) {
+            error = 'Cookies are invalid or expired. Please export fresh cookies from your browser.';
+          } else if (errorMsg.includes('private') || 
+                     errorMsg.includes('members-only')) {
+            error = 'Test video requires membership. Cookies may be valid but cannot access this content.';
+          } else if (errorMsg.includes('video unavailable')) {
+            error = 'Test video unavailable. Cookies may still be valid.';
+          }
+          
+          resolve({ 
+            valid: false, 
+            error,
+            details: stderr 
+          });
+        }
+      });
+    });
+  }
 }
 
 module.exports = YtDlpService;

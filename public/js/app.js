@@ -465,10 +465,37 @@ async function loadCookies() {
 async function saveCookies() {
   const content = document.getElementById('cookies-content').value;
   try {
-    await api.post('/api/cookies', { content });
-    showNotification('Cookies saved', 'success');
+    const result = await api.post('/api/cookies', { content });
+    
+    let message = result.message;
+    if (result.warnings && result.warnings.length > 0) {
+      message += '\nWarnings: ' + result.warnings.join(', ');
+    }
+    
+    showNotification(message, 'success');
   } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
+    // Handle validation errors
+    const errorData = err.message;
+    if (errorData.includes('Invalid cookie format')) {
+      showNotification('Invalid cookie format. Check the format and try again.', 'error');
+    } else {
+      showNotification('Failed: ' + err.message, 'error');
+    }
+  }
+}
+
+async function testCookies() {
+  try {
+    showNotification('Testing cookies with YouTube...', 'info');
+    const result = await api.post('/api/cookies/test');
+    
+    if (result.valid) {
+      showNotification('✓ ' + result.message, 'success');
+    } else {
+      showNotification('✗ ' + result.error, 'error');
+    }
+  } catch (err) {
+    showNotification('Test failed: ' + err.message, 'error');
   }
 }
 

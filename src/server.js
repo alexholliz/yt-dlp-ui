@@ -426,10 +426,47 @@ db.ready.then(() => {
       if (!content) {
         return res.status(400).json({ error: 'Content is required' });
       }
+
+      // Validate cookie format
+      const validation = validateCookieFormat(content);
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: 'Invalid cookie format', 
+          details: validation.errors 
+        });
+      }
+
       fs.writeFileSync(COOKIES_PATH, content, 'utf8');
-      res.json({ success: true, message: 'Cookies saved successfully' });
+      res.json({ 
+        success: true, 
+        message: 'Cookies saved successfully',
+        warnings: validation.warnings 
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Test cookies against YouTube
+  app.post('/api/cookies/test', async (req, res) => {
+    try {
+      if (!fs.existsSync(COOKIES_PATH)) {
+        return res.status(400).json({ 
+          valid: false, 
+          error: 'No cookies file found. Please save cookies first.' 
+        });
+      }
+
+      // Test against a known age-restricted video
+      const testVideoUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'; // Can be any video
+      const result = await ytdlp.testCookies(testVideoUrl);
+      
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ 
+        valid: false, 
+        error: err.message 
+      });
     }
   });
 
@@ -444,6 +481,64 @@ db.ready.then(() => {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Helper function to validate cookie format
+  function validateCookieFormat(content) {
+    const errors = [];
+    const warnings = [];
+    
+    // Check for Netscape format header
+    const lines = content.trim().split('\n');
+    if (lines.length === 0) {
+      errors.push('Cookie file is empty');
+      return { valid: false, errors, warnings };
+    }
+
+    // Look for Netscape header (usually commented)
+    const hasNetscapeHeader = lines.some(line => 
+      line.includes('Netscape HTTP Cookie File')
+    );
+    if (!hasNetscapeHeader) {
+      warnings.push('Missing Netscape HTTP Cookie File header (may still work)');
+    }
+
+    // Check for YouTube domain cookies
+    const hasYouTubeCookies = lines.some(line => 
+      line.includes('.youtube.com') && !line.startsWith('#')
+    );
+    if (!hasYouTubeCookies) {
+      errors.push('No .youtube.com cookies found');
+    }
+
+    // Check for authentication cookies
+    const authCookies = ['LOGIN_INFO', 'SSID', 'SID', 'HSID', 'APISID', 'SAPISID'];
+    const foundAuthCookies = authCookies.filter(cookieName =>
+      lines.some(line => 
+        line.includes(cookieName) && !line.startsWith('#')
+      )
+    );
+
+    if (foundAuthCookies.length === 0) {
+      warnings.push('No authentication cookies found (LOGIN_INFO, SSID, SID, etc.)');
+    }
+
+    // Check for valid cookie format (tab-separated values)
+    const dataLines = lines.filter(line => !line.startsWith('#') && line.trim());
+    const invalidLines = dataLines.filter(line => {
+      const parts = line.split('\t');
+      return parts.length < 6; // Netscape format has 7 fields
+    });
+
+    if (invalidLines.length > 0) {
+      warnings.push(`${invalidLines.length} line(s) may have invalid format`);
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }
 
   // Start server
   app.listen(PORT, '0.0.0.0', () => {
