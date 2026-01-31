@@ -295,13 +295,39 @@ async function handleAddChannel(e) {
   submitBtn.textContent = 'Adding...';
 
   try {
-    await api.post('/api/channels', {
+    const result = await api.post('/api/channels', {
       url, playlist_mode: playlistMode ? 'enumerate' : 'flat',
       flat_mode: flatMode, auto_add_new_playlists: autoAddPlaylists,
       yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays
     });
     e.target.reset();
-    showNotification('Channel added successfully!', 'success');
+    showNotification('Channel added! Enumerating playlists...', 'success');
+    
+    // Switch to channels page and start polling for enumeration completion
+    document.querySelector('.nav-item[data-page="channels"]').click();
+    
+    // Poll for channel name to appear (enumeration complete)
+    if (result.type !== 'video') {
+      let pollCount = 0;
+      const pollInterval = setInterval(async () => {
+        try {
+          const channel = await api.get(`/api/channels/${result.id}`);
+          if (channel.channel_name || pollCount > 20) { // Stop after 20 tries (100 seconds)
+            clearInterval(pollInterval);
+            loadChannelsPage();
+            if (channel.channel_name) {
+              showNotification(`Channel "${channel.channel_name}" ready!`, 'success');
+            }
+          } else {
+            loadChannelsPage(); // Refresh to show progress
+          }
+          pollCount++;
+        } catch (err) {
+          clearInterval(pollInterval);
+        }
+      }, 5000);
+    }
+    
     loadStats();
   } catch (err) {
     showNotification('Failed: ' + err.message, 'error');

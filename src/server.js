@@ -126,8 +126,9 @@ db.ready.then(() => {
         rescrape_interval_days
       });
 
-      // Start enumeration in background
+      // Start enumeration in background and wait for it to complete
       if (finalPlaylistMode === 'enumerate') {
+        // Don't await - let it run in background but respond immediately
         ytdlp.enumeratePlaylists(url)
           .then(result => {
             db.updateChannel(channelId, {
@@ -144,10 +145,10 @@ db.ready.then(() => {
               });
             });
 
-            logger.info(`Enumerated ${result.playlists.length} playlists for channel ${channelId}`);
+            logger.info(`Enumerated ${result.playlists.length} playlists for channel ${channelId} - ${result.channel_name || url}`);
           })
           .catch(err => {
-            logger.error(`Failed to enumerate playlists for channel ${channelId}:`, err);
+            logger.error(`Failed to enumerate playlists for channel ${channelId}: ${err.message}`);
           });
       }
 
