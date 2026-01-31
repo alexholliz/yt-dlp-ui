@@ -147,9 +147,21 @@ async function loadChannelsPage() {
     }
     
     tbody.innerHTML = channelStats.map(c => {
-      const isEnumerating = !c.channel_name && c.playlist_mode === 'enumerate';
+      // Channel is still enumerating if it has no name AND (no playlists found OR hasn't been scraped yet)
+      const isEnumerating = !c.channel_name && (!c.last_scraped_at || c.playlist_count === 0);
+      const isCompleteButNoName = !c.channel_name && c.last_scraped_at && c.playlist_count > 0;
       const hasPlaylists = c.playlist_count > 0;
-      const channelDisplay = c.channel_name || (isEnumerating ? '⏳ Enumerating...' : 'Unknown');
+      
+      let channelDisplay = c.channel_name;
+      if (!channelDisplay) {
+        if (isEnumerating) {
+          channelDisplay = '⏳ Enumerating...';
+        } else if (isCompleteButNoName) {
+          channelDisplay = `Unknown (${c.playlist_count} playlist${c.playlist_count !== 1 ? 's' : ''} found)`;
+        } else {
+          channelDisplay = 'Unknown';
+        }
+      }
       
       return `
         <tr>
@@ -160,7 +172,7 @@ async function loadChannelsPage() {
                 <div class="progress-bar">
                   <div class="progress-fill" style="width: ${hasPlaylists ? '100' : '50'}%"></div>
                 </div>
-                <small style="color: var(--text-muted);">${hasPlaylists ? 'Complete' : 'In progress...'}</small>
+                <small style="color: var(--text-muted);">${hasPlaylists ? 'Complete - found ' + c.playlist_count + ' playlist(s)' : 'Scanning channel...'}</small>
               </div>
             ` : ''}
           </td>

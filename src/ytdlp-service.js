@@ -35,13 +35,15 @@ class YtDlpService {
       const args = [
         '--dump-json',
         '--flat-playlist',
-        '--skip-download'
+        '--skip-download',
+        '--extractor-args', 'youtubetab:approximate_date'
       ];
 
       if (fs.existsSync(this.cookiesPath)) {
         args.push('--cookies', this.cookiesPath);
       }
 
+      // For channels, we need to get the /videos tab and extract playlists from there
       args.push(cleanUrl + '/playlists');
 
       const ytdlp = spawn('yt-dlp', args);
@@ -63,33 +65,47 @@ class YtDlpService {
 
         try {
           const lines = stdout.trim().split('\n').filter(line => line);
+          if (lines.length === 0) {
+            return resolve({ channel_id: null, channel_name: null, playlists: [] });
+          }
+
           const entries = lines.map(line => JSON.parse(line));
           
-          // Group by playlist
+          // Extract channel info and playlists
           const playlistMap = new Map();
-          const channelInfo = {
+          let channelInfo = {
             channel_id: null,
             channel_name: null
           };
 
           entries.forEach(entry => {
+            // Get channel info from first entry
             if (entry.channel_id && !channelInfo.channel_id) {
               channelInfo.channel_id = entry.channel_id;
-              channelInfo.channel_name = entry.channel || entry.uploader;
+              channelInfo.channel_name = entry.channel || entry.uploader || entry.uploader_id;
             }
 
-            if (entry.playlist_id && entry.playlist_title) {
-              if (!playlistMap.has(entry.playlist_id)) {
-                playlistMap.set(entry.playlist_id, {
-                  playlist_id: entry.playlist_id,
-                  playlist_title: entry.playlist_title,
-                  playlist_url: `https://www.youtube.com/playlist?list=${entry.playlist_id}`,
-                  video_count: 0
+            // Each entry in /playlists is itself a playlist
+            if (entry.id && entry._type === 'url') {
+              const playlistId = entry.url ? entry.url.split('list=')[1] : entry.id;
+              if (playlistId && !playlistMap.has(playlistId)) {
+                playlistMap.set(playlistId, {
+                  playlist_id: playlistId,
+                  playlist_title: entry.title || 'Untitled Playlist',
+                  playlist_url: `https://www.youtube.com/playlist?list=${playlistId}`,
+                  video_count: entry.playlist_count || 0
                 });
               }
-              playlistMap.get(entry.playlist_id).video_count++;
             }
           });
+
+          // Fallback: extract channel name from URL if not found
+          if (!channelInfo.channel_name && cleanUrl.includes('/@')) {
+            const match = cleanUrl.match(/@([^\/]+)/);
+            if (match) {
+              channelInfo.channel_name = match[1];
+            }
+          }
 
           resolve({
             ...channelInfo,
