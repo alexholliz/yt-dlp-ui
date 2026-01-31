@@ -161,41 +161,6 @@
             <button class="btn btn-secondary" onclick="deleteCookies()">Delete Cookies</button>
           </div>
         </div>
-
-        <!-- Add Channel Form -->
-        <div class="content-box">
-          <h3>Add Content</h3>
-          <p class="help-text">Add a channel, playlist, or single video URL</p>
-          <form id="add-channel-form">
-            <div class="form-group">
-              <label for="channel-url">YouTube URL</label>
-              <input type="text" id="channel-url" placeholder="Channel, Playlist, or Video URL" required>
-              <small>Examples: @channelname, /playlists URL, playlist?list=..., or watch?v=...</small>
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" id="playlist-mode" checked> Enumerate Playlists (for channels)</label>
-            </div>
-            <div class="form-group" id="playlist-options">
-              <label><input type="checkbox" id="auto-add-playlists"> Auto-enable new playlists</label>
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" id="flat-mode"> Flat mode (single folder)</label>
-            </div>
-            <details class="advanced-options">
-              <summary>Advanced Options</summary>
-              <div class="form-group">
-                <label for="yt-dlp-options">Custom yt-dlp options</label>
-                <textarea id="yt-dlp-options" placeholder="--format best" rows="3"></textarea>
-                <small>Space-separated yt-dlp command line options</small>
-              </div>
-              <div class="form-group">
-                <label for="rescrape-days">Re-scrape interval (days)</label>
-                <input type="number" id="rescrape-days" value="7" min="1">
-              </div>
-            </details>
-            <button type="submit" class="btn btn-primary">Add</button>
-          </form>
-        </div>
       </div>
     </main>
   </div>
@@ -222,6 +187,48 @@
       </div>
       <div class="modal-body" id="video-modal-body">
         <!-- Loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Channel Modal -->
+  <div id="add-channel-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add Content</h2>
+        <button class="close-btn" onclick="closeAddChannelModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="help-text">Add a channel, playlist, or single video URL</p>
+        <form id="add-channel-form">
+          <div class="form-group">
+            <label for="channel-url">YouTube URL</label>
+            <input type="text" id="channel-url" placeholder="Channel, Playlist, or Video URL" required>
+            <small>Examples: @channelname, /playlists URL, playlist?list=..., or watch?v=...</small>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="playlist-mode" checked> Enumerate Playlists (for channels)</label>
+          </div>
+          <div class="form-group" id="playlist-options">
+            <label><input type="checkbox" id="auto-add-playlists"> Auto-enable new playlists</label>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="flat-mode"> Flat mode (single folder)</label>
+          </div>
+          <details class="advanced-options">
+            <summary>Advanced Options</summary>
+            <div class="form-group">
+              <label for="yt-dlp-options">Custom yt-dlp options</label>
+              <textarea id="yt-dlp-options" placeholder="--format best" rows="3"></textarea>
+              <small>Space-separated yt-dlp command line options</small>
+            </div>
+            <div class="form-group">
+              <label for="rescrape-days">Re-scrape interval (days)</label>
+              <input type="number" id="rescrape-days" value="7" min="1">
+            </div>
+          </details>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
       </div>
     </div>
   </div>

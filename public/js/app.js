@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('video-modal')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeVideoModal();
   });
+  document.getElementById('add-channel-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeAddChannelModal();
+  });
 });
 
 function setupNavigation() {
@@ -331,7 +334,8 @@ async function handleAddChannel(e) {
       flat_mode: flatMode, auto_add_new_playlists: autoAddPlaylists,
       yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays
     });
-    e.target.reset();
+    
+    closeAddChannelModal();
     showNotification('Channel added! Enumerating playlists...', 'success');
     
     // Switch to channels page and start polling for enumeration completion
@@ -474,8 +478,14 @@ async function deleteCookies() {
 }
 
 function showAddChannelModal() {
-  document.querySelector('.nav-item[data-page="config"]').click();
+  document.getElementById('add-channel-modal').style.display = 'flex';
   document.getElementById('channel-url').focus();
+}
+
+function closeAddChannelModal() {
+  document.getElementById('add-channel-modal').style.display = 'none';
+  // Reset form
+  document.getElementById('add-channel-form').reset();
 }
 
 function closeChannelModal() {
