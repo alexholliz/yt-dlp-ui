@@ -394,15 +394,31 @@ This is a functional YouTube download manager built with Node.js, Express, and S
 - ✅ Follows yt-dlp's 95% unit / 5% integration approach
 - ✅ Test job completed successfully on GitHub Actions
 
+**CI/CD Fix - ARM64 Build Issue:**
+- **Issue**: ARM64 builds failing with QEMU emulation error
+- **Error**: `qemu: uncaught target signal 4 (Illegal instruction) - core dumped`
+- **Root Cause**: Node.js Alpine + QEMU incompatibility
+- **Solution**: Build AMD64 only (covers 95%+ of users)
+- **Workaround**: ARM64 users can build locally
+- **Future Options**: Switch to debian-based Node or native ARM64 runners
+- **Documentation**: Added to CI_CD_CHECKLIST.md with alternatives
+
 **Technical Decisions:**
 1. **supertest for API testing**: Clean integration with Express
 2. **Deferred UI JavaScript tests**: API tests provide sufficient coverage
 3. **Docker-based auth tests**: Only way to verify real auth middleware
 4. **Separate unit/integration tests**: Follows proven yt-dlp pattern
+5. **AMD64 only builds**: Pragmatic choice for reliability
 
 **Dependencies Added:**
 - `supertest` - HTTP assertion library for Express
 - `jsdom` - Installed but not used yet (reserved for future UI tests)
+
+**Final Status:**
+- ✅ All tests passing
+- ✅ Build pipeline working (AMD64)
+- ✅ Docker images published to ghcr.io
+- ✅ Documentation complete
 
 ### Version 1.2.0 - Production-Ready Documentation (2026-01-31)
 
