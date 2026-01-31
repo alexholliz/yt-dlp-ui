@@ -38,6 +38,7 @@ class DownloadManager {
 
   async processDownload(task) {
     const { videoId, playlistId, channelId, url, options } = task;
+    const fs = require('fs');
 
     try {
       // Update status to downloading
@@ -53,15 +54,23 @@ class DownloadManager {
         }
       });
 
+      // Calculate file size
+      let fileSize = 0;
+      const video = this.db.getVideo(videoId);
+      if (video && video.file_path && fs.existsSync(video.file_path)) {
+        const stats = fs.statSync(video.file_path);
+        fileSize = stats.size;
+      }
+
       // Update status to completed
       const downloadedAt = Math.floor(Date.now() / 1000);
-      this.db.updateVideoStatus(videoId, 'completed', null, downloadedAt);
+      this.db.updateVideoStatus(videoId, 'completed', null, downloadedAt, fileSize);
       this.activeDownloads.delete(videoId);
 
       logger.info(`✓ Downloaded: ${videoId}`);
     } catch (err) {
       logger.error(`✗ Failed to download ${videoId}:`, err.message);
-      this.db.updateVideoStatus(videoId, 'failed');
+      this.db.updateVideoStatus(videoId, 'failed', null, null, 0, err.message);
       this.activeDownloads.delete(videoId);
     }
   }

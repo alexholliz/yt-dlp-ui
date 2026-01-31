@@ -332,7 +332,29 @@ db.ready.then(() => {
   app.get('/api/download/status', (req, res) => {
     try {
       const status = downloadManager.getQueueStatus();
+      // Get video details for active downloads
+      status.downloads = status.downloads.map(d => {
+        const video = db.getVideo(d.video_id);
+        return {
+          ...d,
+          video_title: video?.video_title || d.video_id,
+          channel_name: video?.channel_name || 'Unknown',
+          error_message: video?.error_message
+        };
+      });
       res.json(status);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  
+  // Get pending videos in queue
+  app.get('/api/download/queue', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 10;
+      const offset = parseInt(req.query.offset) || 0;
+      const pendingVideos = db.getPendingVideos(limit, offset);
+      res.json(pendingVideos);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

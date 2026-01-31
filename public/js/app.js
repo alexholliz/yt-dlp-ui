@@ -30,6 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   loadHomePage();
   startPolling();
+  
+  // Modal close on background click
+  document.getElementById('channel-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeChannelModal();
+  });
+  document.getElementById('video-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeVideoModal();
+  });
 });
 
 function setupNavigation() {
@@ -82,10 +90,16 @@ async function loadHistory() {
     } else {
       tbody.innerHTML = history.map(v => `
         <tr>
-          <td><a href="#" onclick="viewVideo('${v.video_id}'); return false;">${escapeHtml(v.video_title)}</a></td>
+          <td>
+            <a href="#" onclick="viewVideo('${v.video_id}'); return false;">${escapeHtml(v.video_title)}</a>
+            ${v.download_status === 'failed' ? `<br><small class="error-text" title="${escapeHtml(v.error_message || 'Download failed')}">${escapeHtml(v.error_message || 'Download failed')}</small>` : ''}
+          </td>
           <td>${formatDate(v.upload_date)}</td>
           <td>${formatTimestamp(v.created_at)}</td>
-          <td>${formatTimestamp(v.downloaded_at)}</td>
+          <td>
+            ${v.download_status === 'completed' ? formatTimestamp(v.downloaded_at) : '-'}
+            <span class="status-badge status-${v.download_status}">${v.download_status}</span>
+          </td>
           <td>${escapeHtml(v.channel_name || 'Unknown')}</td>
         </tr>
       `).join('');
@@ -100,10 +114,26 @@ async function loadHistory() {
 
 async function loadQueue() {
   try {
-    const status = await api.get('/api/download/status');
+    const [status, pendingVideos] = await Promise.all([
+      api.get('/api/download/status'),
+      api.get('/api/download/queue?limit=10')
+    ]);
+    
     const allItems = [
-      ...status.downloads.map(d => ({ ...d, status: 'downloading', type: 'active' })),
-      // We'd need to query pending videos for full queue
+      ...status.downloads.map(d => ({ 
+        ...d, 
+        status: 'downloading', 
+        type: 'active',
+        video_title: d.video_title,
+        channel_name: d.channel_name
+      })),
+      ...pendingVideos.map(v => ({
+        video_id: v.video_id,
+        video_title: v.video_title,
+        channel_name: v.channel_name,
+        status: 'pending',
+        type: 'queued'
+      }))
     ];
     
     const tbody = document.getElementById('queue-table-body');
@@ -115,15 +145,15 @@ async function loadQueue() {
       
       tbody.innerHTML = pageItems.map(item => `
         <tr>
-          <td>${escapeHtml(item.video_id)}</td>
+          <td title="${escapeHtml(item.video_id)}">${escapeHtml(item.video_title || item.video_id)}</td>
           <td><span class="status-badge status-${item.status}">${item.status}</span></td>
           <td>
             ${item.progress ? `
               <div class="progress-bar"><div class="progress-fill" style="width: ${item.progress}%"></div></div>
               ${item.progress.toFixed(1)}%
-            ` : '-'}
+            ` : (item.status === 'pending' ? 'Waiting' : '-')}
           </td>
-          <td>-</td>
+          <td>${item.channel_name || '-'}</td>
         </tr>
       `).join('');
       

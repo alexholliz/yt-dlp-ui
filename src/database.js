@@ -89,6 +89,8 @@ class DB {
         download_status TEXT DEFAULT 'pending',
         downloaded_at INTEGER,
         file_path TEXT,
+        file_size INTEGER DEFAULT 0,
+        error_message TEXT,
         created_at INTEGER DEFAULT (strftime('%s', 'now')),
         updated_at INTEGER DEFAULT (strftime('%s', 'now')),
         FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
@@ -113,6 +115,24 @@ class DB {
       }
     } catch (err) {
       console.warn('Migration check failed:', err.message);
+    }
+    
+    // Migration: Add file_size and error_message columns to videos if they don't exist
+    try {
+      const result = this.db.exec("PRAGMA table_info(videos)");
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes('file_size')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN file_size INTEGER DEFAULT 0");
+        this.save();
+        console.log('Migration: Added file_size column to videos table');
+      }
+      if (!columns.includes('error_message')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN error_message TEXT");
+        this.save();
+        console.log('Migration: Added error_message column to videos table');
+      }
+    } catch (err) {
+      console.warn('Migration check for videos failed:', err.message);
     }
   }
 
@@ -280,13 +300,27 @@ class DB {
     return this.rowToObject(result[0].columns, result[0].values[0]);
   }
 
-  updateVideoStatus(videoId, status, filePath = null, downloadedAt = null) {
+  updateVideoStatus(videoId, status, filePath = null, downloadedAt = null, fileSize = 0, errorMessage = null) {
     this.db.run(`
       UPDATE videos 
-      SET download_status = ?, file_path = ?, downloaded_at = ?, updated_at = strftime('%s', 'now')
+      SET download_status = ?, file_path = ?, downloaded_at = ?, file_size = ?, error_message = ?, updated_at = strftime('%s', 'now')
       WHERE video_id = ?
-    `, [status, filePath, downloadedAt, videoId]);
+    `, [status, filePath, downloadedAt, fileSize, errorMessage, videoId]);
     this.save();
+  }
+  
+  getPendingVideos(limit = 10, offset = 0) {
+    const result = this.db.exec(`
+      SELECT v.*, c.channel_name, p.playlist_title
+      FROM videos v
+      LEFT JOIN channels c ON v.channel_id = c.id
+      LEFT JOIN playlists p ON v.playlist_id = p.id
+      WHERE v.download_status = 'pending'
+      ORDER BY v.created_at ASC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
   }
 
   // Statistics
@@ -294,12 +328,15 @@ class DB {
     const channelCount = this.db.exec('SELECT COUNT(*) as count FROM channels');
     const totalDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'completed'");
     const pendingDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'pending'");
+    const librarySizeResult = this.db.exec("SELECT SUM(file_size) as total FROM videos WHERE download_status = 'completed'");
+    
+    const librarySize = librarySizeResult[0]?.values[0]?.[0] || 0;
     
     return {
       channel_count: channelCount[0]?.values[0]?.[0] || 0,
       total_downloads: totalDownloads[0]?.values[0]?.[0] || 0,
       pending_downloads: pendingDownloads[0]?.values[0]?.[0] || 0,
-      library_size: 0 // Will be calculated from file system
+      library_size: librarySize
     };
   }
 
@@ -308,8 +345,8 @@ class DB {
       SELECT v.*, c.channel_name 
       FROM videos v
       LEFT JOIN channels c ON v.channel_id = c.id
-      WHERE v.download_status = 'completed'
-      ORDER BY v.downloaded_at DESC
+      WHERE v.download_status IN ('completed', 'failed')
+      ORDER BY v.updated_at DESC
       LIMIT ? OFFSET ?
     `, [limit, offset]);
     
