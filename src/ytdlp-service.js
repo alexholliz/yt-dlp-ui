@@ -1,10 +1,51 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 class YtDlpService {
-  constructor(cookiesPath) {
+  constructor(cookiesPath, youtubeApiService = null) {
     this.cookiesPath = cookiesPath;
+    this.youtubeApi = youtubeApiService;
+  }
+
+  // Parse command line arguments respecting quotes
+  parseArgs(argsString) {
+    if (!argsString) return [];
+    
+    const args = [];
+    let current = '';
+    let inQuotes = false;
+    let quoteChar = null;
+    
+    for (let i = 0; i < argsString.length; i++) {
+      const char = argsString[i];
+      
+      if ((char === '"' || char === "'") && (i === 0 || argsString[i-1] !== '\\')) {
+        if (!inQuotes) {
+          inQuotes = true;
+          quoteChar = char;
+        } else if (char === quoteChar) {
+          inQuotes = false;
+          quoteChar = null;
+        } else {
+          current += char;
+        }
+      } else if (char === ' ' && !inQuotes) {
+        if (current) {
+          args.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current) {
+      args.push(current);
+    }
+    
+    return args;
   }
 
   detectUrlType(url) {
@@ -28,6 +69,31 @@ class YtDlpService {
   }
 
   async enumeratePlaylists(channelUrl) {
+    // Try YouTube API first if available
+    if (this.youtubeApi && this.youtubeApi.hasValidApiKey()) {
+      try {
+        logger.info('Attempting enumeration with YouTube Data API');
+        const playlists = await this.youtubeApi.enumeratePlaylists(channelUrl);
+        
+        // Extract channel info from URL as best we can
+        const channelIdMatch = channelUrl.match(/\/channel\/(UC[\w-]+)/);
+        const handleMatch = channelUrl.match(/@([\w-]+)/);
+        
+        return {
+          channel_id: channelIdMatch ? channelIdMatch[1] : null,
+          channel_name: handleMatch ? handleMatch[1] : null,
+          playlists,
+          method: 'youtube-api'
+        };
+      } catch (err) {
+        logger.warn('YouTube API enumeration failed, falling back to yt-dlp:', err.message);
+        // Fall through to yt-dlp method
+      }
+    }
+
+    // Fallback to yt-dlp web scraping
+    logger.info('Using yt-dlp for enumeration (no API key or API failed)');
+    
     return new Promise((resolve, reject) => {
       // Remove /playlists suffix if present, and also remove trailing slash
       const cleanUrl = channelUrl.replace(/\/playlists\/?$/, '').replace(/\/$/, '');
@@ -66,7 +132,7 @@ class YtDlpService {
         try {
           const lines = stdout.trim().split('\n').filter(line => line);
           if (lines.length === 0) {
-            return resolve({ channel_id: null, channel_name: null, playlists: [] });
+            return resolve({ channel_id: null, channel_name: null, playlists: [], method: 'yt-dlp' });
           }
 
           const entries = lines.map(line => JSON.parse(line));
@@ -109,7 +175,8 @@ class YtDlpService {
 
           resolve({
             ...channelInfo,
-            playlists: Array.from(playlistMap.values())
+            playlists: Array.from(playlistMap.values()),
+            method: 'yt-dlp'
           });
         } catch (err) {
           reject(new Error(`Failed to parse yt-dlp output: ${err.message}`));
@@ -159,6 +226,25 @@ class YtDlpService {
   }
 
   async enumeratePlaylistVideos(playlistUrl) {
+    // Try YouTube API first if available
+    if (this.youtubeApi && this.youtubeApi.hasValidApiKey()) {
+      try {
+        // Extract playlist ID from URL
+        const playlistIdMatch = playlistUrl.match(/[?&]list=([^&]+)/);
+        if (playlistIdMatch) {
+          logger.info('Attempting playlist enumeration with YouTube Data API');
+          const videos = await this.youtubeApi.enumeratePlaylistVideos(playlistIdMatch[1]);
+          return videos;
+        }
+      } catch (err) {
+        logger.warn('YouTube API playlist enumeration failed, falling back to yt-dlp:', err.message);
+        // Fall through to yt-dlp method
+      }
+    }
+
+    // Fallback to yt-dlp web scraping
+    logger.info('Using yt-dlp for playlist enumeration (no API key or API failed)');
+    
     return new Promise((resolve, reject) => {
       const args = [
         '--dump-json',
@@ -219,6 +305,12 @@ class YtDlpService {
       if (fs.existsSync(this.cookiesPath)) {
         args.push('--cookies', this.cookiesPath);
       }
+      
+      // Enable Node.js runtime for YouTube's JavaScript challenges
+      args.push('--js-runtimes', 'node');
+      
+      // Download remote challenge solver components
+      args.push('--remote-components', 'ejs:github');
 
       if (options.verbose) {
         args.push('-v');
@@ -260,22 +352,42 @@ class YtDlpService {
         args.push('--write-thumbnail');
       }
 
+      // If playlist item index is specified, only download that specific item
+      if (options.playlistItemIndex) {
+        args.push('--playlist-items', options.playlistItemIndex.toString());
+      }
+
+      // Print file path after download for capturing
+      args.push('--print', 'after_move:filepath');
+      
       // Add progress output for parsing
       args.push('--newline', '--progress');
 
       // Add custom options if provided
       if (options.customArgs) {
-        args.push(...options.customArgs.split(' ').filter(a => a));
+        const parsedArgs = this.parseArgs(options.customArgs);
+        args.push(...parsedArgs);
       }
 
       args.push(url);
 
       const ytdlp = spawn('yt-dlp', args);
       let lastProgress = {};
+      let capturedFilePath = null;
       
       ytdlp.stdout.on('data', (data) => {
         const output = data.toString();
         console.log(output);
+
+        // Capture file path (looks for absolute path lines)
+        const lines = output.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          // File paths will be absolute paths, not progress or other output
+          if (trimmed.startsWith('/') || (trimmed.match(/^[A-Z]:\\/))) {
+            capturedFilePath = trimmed;
+          }
+        }
 
         // Parse progress
         if (onProgress && output.includes('%')) {
@@ -296,7 +408,7 @@ class YtDlpService {
 
       ytdlp.on('close', (code) => {
         if (code === 0) {
-          resolve();
+          resolve(capturedFilePath);
         } else {
           reject(new Error(`yt-dlp exited with code ${code}`));
         }
@@ -308,7 +420,10 @@ class YtDlpService {
     return new Promise((resolve, reject) => {
       const args = [
         '--dump-json',
-        '--skip-download'
+        '--skip-download',
+        '--js-runtimes', 'node',
+        '--remote-components', 'ejs:github',
+        '--no-warnings'
       ];
 
       if (fs.existsSync(this.cookiesPath)) {
@@ -322,7 +437,11 @@ class YtDlpService {
 
       args.push(testVideoUrl);
 
-      const ytdlp = spawn('yt-dlp', args);
+      logger.info(`Testing cookies with: ${testVideoUrl}`);
+      
+      const ytdlp = spawn('yt-dlp', args, {
+        env: { ...process.env, PATH: process.env.PATH }  // Ensure Node.js is in PATH
+      });
       let stdout = '';
       let stderr = '';
 
@@ -335,28 +454,43 @@ class YtDlpService {
       });
 
       ytdlp.on('close', (code) => {
-        if (code === 0) {
-          try {
-            // If we can parse video info, cookies work
-            JSON.parse(stdout);
+        // Try to parse video info - if we get valid metadata, cookies work
+        try {
+          const videoInfo = JSON.parse(stdout);
+          if (videoInfo.id || videoInfo.title || videoInfo.uploader) {
+            // We got valid video metadata, cookies are working
+            const accountDetected = stderr.includes('Found YouTube account cookies') || 
+                                   stderr.includes('Detected YouTube Premium');
             resolve({ 
               valid: true, 
-              message: 'Cookies are valid and working with YouTube' 
+              message: accountDetected ? 
+                'Cookies are valid - YouTube account detected!' : 
+                'Cookies are valid and working with YouTube' 
             });
-          } catch (err) {
-            resolve({ 
-              valid: false, 
-              error: 'Could not parse video information' 
-            });
+            return;
           }
+        } catch (err) {
+          // Could not parse JSON, check error messages
+        }
+
+        // Log the actual error for debugging
+        logger.error(`Cookie test failed. Exit code: ${code}`);
+        logger.error(`stderr: ${stderr.substring(0, 500)}`);
+
+        // If we couldn't get video info, check what went wrong
+        if (code === 0) {
+          resolve({ 
+            valid: false, 
+            error: 'Could not parse video information (but no error occurred)' 
+          });
         } else {
           // Check for specific error messages
           const errorMsg = stderr.toLowerCase();
           let error = 'Cookie validation failed';
           
           if (errorMsg.includes('sign in to confirm your age') || 
-              errorMsg.includes('age-restricted')) {
-            error = 'Cookies are invalid or expired. Please export fresh cookies from your browser.';
+              errorMsg.includes('login_required')) {
+            error = 'Cookies are invalid or expired. Please export fresh cookies from your browser while logged into YouTube.';
           } else if (errorMsg.includes('private') || 
                      errorMsg.includes('members-only')) {
             error = 'Test video requires membership. Cookies may be valid but cannot access this content.';

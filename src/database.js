@@ -102,6 +102,17 @@ class DB {
       CREATE INDEX IF NOT EXISTS idx_videos_channel ON videos(channel_id);
       CREATE INDEX IF NOT EXISTS idx_videos_playlist ON videos(playlist_id);
       CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(download_status);
+
+      CREATE TABLE IF NOT EXISTS profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        output_template TEXT NOT NULL,
+        format_selection TEXT,
+        merge_output_format TEXT,
+        additional_args TEXT,
+        created_at INTEGER DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
     `);
     
     // Migration: Add video_count column if it doesn't exist
@@ -131,16 +142,103 @@ class DB {
         this.save();
         console.log('Migration: Added error_message column to videos table');
       }
+      if (!columns.includes('resolution')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN resolution TEXT");
+        this.save();
+        console.log('Migration: Added resolution column to videos table');
+      }
+      if (!columns.includes('fps')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN fps INTEGER");
+        this.save();
+        console.log('Migration: Added fps column to videos table');
+      }
+      if (!columns.includes('vcodec')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN vcodec TEXT");
+        this.save();
+        console.log('Migration: Added vcodec column to videos table');
+      }
+      if (!columns.includes('acodec')) {
+        this.db.run("ALTER TABLE videos ADD COLUMN acodec TEXT");
+        this.save();
+        console.log('Migration: Added acodec column to videos table');
+      }
     } catch (err) {
       console.warn('Migration check for videos failed:', err.message);
     }
+
+    // Migration: Add profile_id to channels
+    try {
+      const result = this.db.exec("PRAGMA table_info(channels)");
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes('profile_id')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN profile_id INTEGER REFERENCES profiles(id)");
+        this.save();
+        console.log('Migration: Added profile_id column to channels table');
+      }
+    } catch (err) {
+      console.warn('Migration check for channels failed:', err.message);
+    }
+  }
+
+  // Profiles
+  addProfile(profileData) {
+    this.db.run(`
+      INSERT INTO profiles (name, output_template, format_selection, merge_output_format, additional_args)
+      VALUES (?, ?, ?, ?, ?)
+    `, [
+      profileData.name,
+      profileData.output_template,
+      profileData.format_selection || null,
+      profileData.merge_output_format || null,
+      profileData.additional_args || null
+    ]);
+    const result = this.db.exec('SELECT last_insert_rowid() as id');
+    this.save();
+    return result[0].values[0][0];
+  }
+
+  getAllProfiles() {
+    const result = this.db.exec('SELECT * FROM profiles ORDER BY name');
+    if (result.length === 0) return [];
+    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
+  }
+
+  getProfile(id) {
+    const result = this.db.exec('SELECT * FROM profiles WHERE id = ?', [id]);
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return this.rowToObject(result[0].columns, result[0].values[0]);
+  }
+
+  updateProfile(id, profileData) {
+    const fields = [];
+    const values = [];
+    
+    ['name', 'output_template', 'format_selection', 'merge_output_format', 'additional_args'].forEach(field => {
+      if (profileData[field] !== undefined) {
+        fields.push(`${field} = ?`);
+        values.push(profileData[field]);
+      }
+    });
+    
+    if (fields.length === 0) return;
+    
+    fields.push('updated_at = strftime("%s", "now")');
+    values.push(id);
+    
+    this.db.run(`UPDATE profiles SET ${fields.join(', ')} WHERE id = ?`, values);
+    this.save();
+  }
+
+  deleteProfile(id) {
+    this.db.run('DELETE FROM profiles WHERE id = ?', [id]);
+    this.save();
   }
 
   // Channels
   addChannel(url, options = {}) {
     const stmt = this.db.prepare(`
-      INSERT INTO channels (url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, rescrape_interval_days)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO channels (url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, rescrape_interval_days, profile_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run([
       url,
@@ -148,7 +246,8 @@ class DB {
       options.flat_mode ? 1 : 0,
       options.auto_add_new_playlists ? 1 : 0,
       options.yt_dlp_options || null,
-      options.rescrape_interval_days || 7
+      options.rescrape_interval_days || 7,
+      options.profile_id || null
     ]);
     const result = this.db.exec('SELECT last_insert_rowid() as id');
     this.save();
@@ -199,6 +298,10 @@ class DB {
       fields.push('yt_dlp_options = ?');
       values.push(data.yt_dlp_options);
     }
+    if (data.profile_id !== undefined) {
+      fields.push('profile_id = ?');
+      values.push(data.profile_id);
+    }
 
     fields.push('updated_at = strftime("%s", "now")');
     values.push(id);
@@ -220,7 +323,6 @@ class DB {
       ON CONFLICT(channel_id, playlist_id) DO UPDATE SET
         playlist_title = excluded.playlist_title,
         playlist_url = excluded.playlist_url,
-        video_count = excluded.video_count,
         updated_at = strftime('%s', 'now')
     `, [
       channelId,
@@ -252,28 +354,33 @@ class DB {
 
   // Videos
   addVideo(videoData) {
-    this.db.run(`
-      INSERT INTO videos (
-        channel_id, playlist_id, video_id, video_title, video_url,
-        uploader, upload_date, duration, playlist_index, download_status
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(video_id) DO UPDATE SET
-        video_title = excluded.video_title,
-        updated_at = strftime('%s', 'now')
-    `, [
-      videoData.channel_id,
-      videoData.playlist_id || null,
-      videoData.video_id,
-      videoData.video_title,
-      videoData.video_url,
-      videoData.uploader,
-      videoData.upload_date,
-      videoData.duration,
-      videoData.playlist_index || null,
-      videoData.download_status || 'pending'
-    ]);
-    this.save();
+    try {
+      this.db.run(`
+        INSERT INTO videos (
+          channel_id, playlist_id, video_id, video_title, video_url,
+          uploader, upload_date, duration, playlist_index, download_status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(video_id) DO UPDATE SET
+          video_title = excluded.video_title,
+          updated_at = strftime('%s', 'now')
+      `, [
+        videoData.channel_id,
+        videoData.playlist_id || null,
+        videoData.video_id,
+        videoData.video_title,
+        videoData.video_url,
+        videoData.uploader || null,
+        videoData.upload_date || null,
+        videoData.duration || null,
+        videoData.playlist_index || null,
+        videoData.download_status || 'pending'
+      ]);
+      this.save();
+    } catch (err) {
+      console.error('addVideo failed for', videoData.video_id, ':', err);
+      throw new Error(`Failed to add video to database: ${err.message || err.toString()}`);
+    }
   }
 
   getVideosByChannel(channelId) {
@@ -308,6 +415,16 @@ class DB {
     `, [status, filePath, downloadedAt, fileSize, errorMessage, videoId]);
     this.save();
   }
+
+  updateVideoMetadata(videoId, metadata) {
+    const { upload_date, resolution, fps, vcodec, acodec } = metadata;
+    this.db.run(`
+      UPDATE videos 
+      SET upload_date = ?, resolution = ?, fps = ?, vcodec = ?, acodec = ?, updated_at = strftime('%s', 'now')
+      WHERE video_id = ?
+    `, [upload_date || null, resolution || null, fps || null, vcodec || null, acodec || null, videoId]);
+    this.save();
+  }
   
   getPendingVideos(limit = 10, offset = 0) {
     const result = this.db.exec(`
@@ -340,15 +457,26 @@ class DB {
     };
   }
 
-  getRecentDownloads(limit = 5, offset = 0) {
-    const result = this.db.exec(`
-      SELECT v.*, c.channel_name 
+  getRecentDownloads(limit = 5, offset = 0, status = null) {
+    let query = `
+      SELECT v.*, c.channel_name, p.playlist_title
       FROM videos v
       LEFT JOIN channels c ON v.channel_id = c.id
-      WHERE v.download_status IN ('completed', 'failed')
-      ORDER BY v.updated_at DESC
-      LIMIT ? OFFSET ?
-    `, [limit, offset]);
+      LEFT JOIN playlists p ON v.playlist_id = p.id
+    `;
+    
+    const params = [];
+    if (status) {
+      query += ` WHERE v.download_status = ?`;
+      params.push(status);
+    } else {
+      query += ` WHERE v.download_status IN ('completed', 'failed')`;
+    }
+    
+    query += ` ORDER BY v.updated_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+    
+    const result = this.db.exec(query, params);
     
     if (result.length === 0) return [];
     return result[0].values.map(row => this.rowToObject(result[0].columns, row));
@@ -364,6 +492,7 @@ class DB {
         c.last_scraped_at,
         COUNT(CASE WHEN v.download_status = 'pending' THEN 1 END) as pending_count,
         COUNT(CASE WHEN v.download_status = 'completed' THEN 1 END) as completed_count,
+        SUM(CASE WHEN v.download_status = 'completed' THEN v.file_size ELSE 0 END) as total_size,
         (SELECT COUNT(*) FROM playlists WHERE channel_id = c.id) as playlist_count
       FROM channels c
       LEFT JOIN videos v ON c.id = v.channel_id

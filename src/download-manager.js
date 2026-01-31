@@ -9,11 +9,82 @@ class DownloadManager {
     this.activeDownloads = new Map(); // video_id -> download info
     this.queue = [];
     this.isProcessing = false;
+    this.isShuttingDown = false;
     this.concurrency = parseInt(process.env.YT_DL_WORKER_CONCURRENCY || '2');
+  }
+
+  async gracefulShutdown(timeoutMs = 180000) { // 3 minutes default
+    if (this.activeDownloads.size === 0) {
+      logger.info('No active downloads, shutting down immediately');
+      return;
+    }
+
+    logger.warn(`Graceful shutdown initiated with ${this.activeDownloads.size} active downloads`);
+    logger.warn(`Waiting up to ${timeoutMs / 1000} seconds for downloads to complete...`);
+    
+    this.isShuttingDown = true;
+    const startTime = Date.now();
+    
+    // Wait for downloads to complete or timeout
+    while (this.activeDownloads.size > 0 && (Date.now() - startTime) < timeoutMs) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (this.activeDownloads.size > 0) {
+        logger.info(`Waiting for ${this.activeDownloads.size} downloads to complete...`);
+      }
+    }
+
+    if (this.activeDownloads.size > 0) {
+      logger.error(`Timeout reached with ${this.activeDownloads.size} downloads still active`);
+      logger.error('Cancelling remaining downloads and cleaning up partial files...');
+      
+      // Clean up partial downloads
+      for (const [videoId, info] of this.activeDownloads.entries()) {
+        // Find and remove .part files for this video
+        if (info.downloadPath) {
+          this.cleanupPartialFiles(info.downloadPath, videoId);
+        }
+        
+        // Mark as failed in database
+        this.db.updateVideoStatus(videoId, 'failed', null, null, 0, 'Download cancelled due to shutdown timeout');
+      }
+      
+      this.activeDownloads.clear();
+    } else {
+      logger.info('All downloads completed successfully before shutdown');
+    }
   }
 
   async startDownloads() {
     if (this.isProcessing) return;
+    
+    // Load pending videos from database if queue is empty
+    if (this.queue.length === 0) {
+      logger.info('Queue is empty, loading pending videos from database...');
+      const pendingVideos = this.db.getRecentDownloads(100, 0, 'pending');
+      
+      for (const video of pendingVideos) {
+        const playlist = this.db.getPlaylist(video.playlist_id);
+        const channel = this.db.getChannel(video.channel_id);
+        
+        if (playlist && channel) {
+          this.queue.push({
+            videoId: video.video_id,
+            playlistId: video.playlist_id,
+            channelId: video.channel_id,
+            url: playlist.playlist_url,
+            playlistItemIndex: video.playlist_index,
+            options: this.buildDownloadOptions(channel, playlist)
+          });
+        }
+      }
+      
+      logger.info(`Loaded ${this.queue.length} pending videos into queue`);
+    }
+    
+    if (this.queue.length === 0) {
+      logger.info('No pending downloads in queue');
+      return;
+    }
     
     this.isProcessing = true;
     
@@ -28,7 +99,7 @@ class DownloadManager {
   }
 
   async worker() {
-    while (this.queue.length > 0) {
+    while (this.queue.length > 0 && !this.isShuttingDown) {
       const task = this.queue.shift();
       if (task) {
         await this.processDownload(task);
@@ -37,16 +108,28 @@ class DownloadManager {
   }
 
   async processDownload(task) {
-    const { videoId, playlistId, channelId, url, options } = task;
+    const { videoId, playlistId, channelId, url, playlistItemIndex, options } = task;
     const fs = require('fs');
+    const path = require('path');
 
     try {
       // Update status to downloading
       this.db.updateVideoStatus(videoId, 'downloading');
-      this.activeDownloads.set(videoId, { progress: 0, startTime: Date.now() });
+      
+      // Track download with potential partial file pattern
+      this.activeDownloads.set(videoId, { 
+        progress: 0, 
+        startTime: Date.now(),
+        downloadPath: options.outputPath
+      });
+
+      // Add playlist item index to options if specified
+      if (playlistItemIndex) {
+        options.playlistItemIndex = playlistItemIndex;
+      }
 
       // Download the video
-      await this.ytdlp.download(url, options, (progress) => {
+      const filePath = await this.ytdlp.download(url, options, (progress) => {
         const info = this.activeDownloads.get(videoId);
         if (info) {
           info.progress = progress.percent;
@@ -54,25 +137,117 @@ class DownloadManager {
         }
       });
 
-      // Calculate file size
+      // Calculate file size and get metadata
       let fileSize = 0;
-      const video = this.db.getVideo(videoId);
-      if (video && video.file_path && fs.existsSync(video.file_path)) {
-        const stats = fs.statSync(video.file_path);
+      let metadata = {};
+      
+      logger.info(`Download completed, file path: ${filePath}`);
+      
+      if (filePath && fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
         fileSize = stats.size;
+        logger.info(`File size: ${fileSize} bytes`);
+        
+        // Try to read metadata from .info.json file
+        const infoJsonPath = filePath.replace(/\.[^.]+$/, '.info.json');
+        if (fs.existsSync(infoJsonPath)) {
+          try {
+            const infoContent = fs.readFileSync(infoJsonPath, 'utf8');
+            const info = JSON.parse(infoContent);
+            metadata = {
+              upload_date: info.upload_date,
+              resolution: info.resolution || `${info.width}x${info.height}`,
+              fps: info.fps,
+              vcodec: info.vcodec,
+              acodec: info.acodec
+            };
+            logger.info(`Metadata extracted: ${JSON.stringify(metadata)}`);
+          } catch (err) {
+            logger.error(`Failed to read metadata for ${videoId}:`, err.message);
+          }
+        } else {
+          logger.warn(`No info.json found at: ${infoJsonPath}`);
+        }
+      } else {
+        logger.warn(`File path is ${filePath ? 'invalid' : 'null'} or file does not exist`);
       }
 
-      // Update status to completed
-      const downloadedAt = Math.floor(Date.now() / 1000);
-      this.db.updateVideoStatus(videoId, 'completed', null, downloadedAt, fileSize);
+      // Update video with file info and metadata
+      this.db.updateVideoStatus(videoId, 'completed', filePath, Math.floor(Date.now() / 1000), fileSize);
+      
+      // Update metadata fields if we have them
+      if (metadata.upload_date || metadata.resolution) {
+        this.db.updateVideoMetadata(videoId, metadata);
+      }
+      
       this.activeDownloads.delete(videoId);
 
-      logger.info(`✓ Downloaded: ${videoId}`);
+      logger.info(`✓ Downloaded: ${videoId} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
     } catch (err) {
       logger.error(`✗ Failed to download ${videoId}:`, err.message);
       this.db.updateVideoStatus(videoId, 'failed', null, null, 0, err.message);
       this.activeDownloads.delete(videoId);
+      
+      // Clean up any partial files on error
+      if (options.outputPath) {
+        this.cleanupPartialFiles(options.outputPath, videoId);
+      }
     }
+  }
+
+  cleanupPartialFiles(directory, videoId) {
+    const fs = require('fs');
+    const path = require('path');
+    
+    try {
+      const findPartFiles = (dir) => {
+        const files = [];
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            files.push(...findPartFiles(fullPath));
+          } else if (entry.isFile() && entry.name.includes(videoId) && entry.name.endsWith('.part')) {
+            files.push(fullPath);
+          }
+        }
+        return files;
+      };
+      
+      const partFiles = findPartFiles(directory);
+      partFiles.forEach(file => {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+          logger.info(`Cleaned up partial file: ${file}`);
+        }
+      });
+    } catch (cleanupErr) {
+      logger.error(`Failed to clean up partial files: ${cleanupErr.message}`);
+    }
+  }
+
+  buildDownloadOptions(channel, playlist) {
+    const path = require('path');
+    const outputTemplate = channel.flat_mode
+      ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
+      : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
+
+    return {
+      outputPath: this.downloadsPath,
+      outputTemplate,
+      format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
+      mergeOutputFormat: 'mp4',
+      writeInfoJson: true,
+      noRestrictFilenames: true,
+      writeThumbnail: true,
+      downloadArchive: path.join(this.downloadsPath, '.downloaded'),
+      customArgs: channel.yt_dlp_options,
+      playlistMetadata: {
+        playlist_title: playlist.playlist_title,
+        playlist_id: playlist.playlist_id
+      }
+    };
   }
 
   async downloadPlaylist(playlistId) {
@@ -91,6 +266,10 @@ class DownloadManager {
       logger.info(`Enumerating videos in playlist: ${playlist.playlist_title}`);
       const videos = await this.ytdlp.enumeratePlaylistVideos(playlist.playlist_url);
       logger.info(`Found ${videos.length} videos in playlist`);
+
+      // Update playlist video count with actual count
+      this.db.db.run('UPDATE playlists SET video_count = ?, updated_at = strftime("%s", "now") WHERE id = ?', [videos.length, playlistId]);
+      this.db.save();
 
       // Add videos to database
       for (const video of videos) {
@@ -119,37 +298,51 @@ class DownloadManager {
         ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
         : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
-      const downloadOptions = {
-        outputPath: this.downloadsPath,
-        outputTemplate,
-        format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
-        mergeOutputFormat: 'mp4',
-        writeInfoJson: true,
-        noRestrictFilenames: true,
-        writeThumbnail: true,
-        downloadArchive: path.join(this.downloadsPath, '.downloaded'),
-        customArgs: channel.yt_dlp_options
-      };
-
-      // Queue videos for download
+      // Queue videos for download with playlist metadata
       for (const video of pendingVideos) {
+        const downloadOptions = {
+          outputPath: this.downloadsPath,
+          outputTemplate,
+          format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
+          mergeOutputFormat: 'mp4',
+          writeInfoJson: true,
+          noRestrictFilenames: true,
+          writeThumbnail: true,
+          downloadArchive: path.join(this.downloadsPath, '.downloaded'),
+          customArgs: channel.yt_dlp_options,
+          // Pass playlist metadata to yt-dlp
+          playlistMetadata: {
+            playlist_title: playlist.playlist_title,
+            playlist_id: playlist.playlist_id,
+            playlist_index: video.playlist_index
+          }
+        };
+        
         this.queue.push({
           videoId: video.video_id,
           playlistId: playlistId,
           channelId: channel.id,
-          url: video.video_url,
+          // Use playlist URL with specific item index for proper metadata
+          url: `${playlist.playlist_url}`,
+          playlistItemIndex: video.playlist_index,
           options: downloadOptions
         });
       }
+      
+      logger.info(`Queued ${pendingVideos.length} videos for download`);
 
       // Start processing if not already running
       if (!this.isProcessing) {
+        logger.info('Starting download workers...');
         this.startDownloads();
+      } else {
+        logger.info('Download workers already running');
       }
 
       return { queued: pendingVideos.length };
     } catch (err) {
-      logger.error(`Failed to download playlist ${playlistId}:`, err.message, err.stack);
+      logger.error(`Failed to download playlist ${playlistId}:`, err.message || err.toString());
+      if (err.stack) logger.error('Stack trace:', err.stack);
       throw err;
     }
   }

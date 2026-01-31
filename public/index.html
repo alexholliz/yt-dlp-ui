@@ -22,6 +22,10 @@
           <span class="icon">📺</span>
           <span>Channels</span>
         </a>
+        <a href="#profiles" class="nav-item" data-page="profiles">
+          <span class="icon">🎯</span>
+          <span>yt-dlp Profiles</span>
+        </a>
         <a href="#config" class="nav-item" data-page="config">
           <span class="icon">⚙️</span>
           <span>Config</span>
@@ -66,13 +70,14 @@
               <tr>
                 <th>Video Title</th>
                 <th>Upload Date</th>
+                <th>Status</th>
                 <th>Indexed</th>
                 <th>Downloaded</th>
                 <th>Channel</th>
               </tr>
             </thead>
             <tbody id="history-table-body">
-              <tr><td colspan="5" class="empty-state">No downloads yet</td></tr>
+              <tr><td colspan="6" class="empty-state">No downloads yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -87,6 +92,7 @@
               <button class="btn-icon" onclick="nextQueuePage()" id="queue-next">›</button>
             </div>
           </div>
+          <div id="queue-status"></div>
           <table class="data-table">
             <thead>
               <tr>
@@ -119,11 +125,37 @@
                 <th>Pending</th>
                 <th>Downloaded</th>
                 <th>Size</th>
+                <th>Last Scraped</th>
                 <th>Enabled</th>
               </tr>
             </thead>
             <tbody id="channels-table-body">
-              <tr><td colspan="5" class="empty-state">No channels added yet</td></tr>
+              <tr><td colspan="6" class="empty-state">No channels added yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Profiles Page -->
+      <div class="page" id="page-profiles">
+        <h2 class="page-title">yt-dlp Profiles</h2>
+        
+        <div class="content-box">
+          <div class="box-header">
+            <h3>Download Profiles</h3>
+            <button class="btn btn-primary" onclick="showAddProfileModal()">+ Add Profile</button>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Profile Name</th>
+                <th>Output Template</th>
+                <th>Format</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="profiles-table-body">
+              <tr><td colspan="4" class="empty-state">No profiles created yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -165,6 +197,28 @@
             <button class="btn btn-secondary" onclick="deleteCookies()">Delete Cookies</button>
           </div>
         </div>
+
+        <!-- YouTube Data API -->
+        <div class="content-box">
+          <h3>
+            YouTube Data API v3 (Optional)
+            <span class="help-icon" title="Speeds up channel enumeration. Uses yt-dlp web scraping if not provided.">?</span>
+            <a href="https://github.com/kieraneglin/pinchflat/wiki/Generating-a-YouTube-API-key" target="_blank" class="docs-link">📖 Setup Guide</a>
+          </h3>
+          <p class="help-text">For faster channel/playlist enumeration. Automatically falls back to yt-dlp if quota exceeded or not provided.</p>
+          <div class="form-group">
+            <label for="youtube-api-key">API Key</label>
+            <input type="text" id="youtube-api-key" placeholder="AIzaSy...">
+            <small>Free tier: 10,000 units/day (≈100-200 full channel enumerations) • Resets at midnight Pacific Time</small>
+          </div>
+          <div class="button-group">
+            <button class="btn btn-primary" onclick="saveYouTubeApiKey()">Save API Key</button>
+            <button class="btn btn-secondary" onclick="testYouTubeApiKey()">Test API Key</button>
+            <button class="btn btn-secondary" onclick="deleteYouTubeApiKey()">Delete API Key</button>
+            <button class="btn btn-secondary" onclick="loadYouTubeApiQuota()">Refresh Quota</button>
+          </div>
+          <div id="youtube-api-quota-status" style="margin-top: 1rem;"></div>
+        </div>
       </div>
     </main>
   </div>
@@ -195,6 +249,19 @@
     </div>
   </div>
 
+  <!-- Playlist Detail Modal -->
+  <div id="playlist-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-playlist-title">Playlist Videos</h2>
+        <button class="close-btn" onclick="closePlaylistModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="playlist-modal-body">
+        <!-- Loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
   <!-- Add Channel Modal -->
   <div id="add-channel-modal" class="modal" style="display: none;">
     <div class="modal-content">
@@ -211,6 +278,13 @@
             <small>Examples: @channelname, /playlists URL, playlist?list=..., or watch?v=...</small>
           </div>
           <div class="form-group">
+            <label for="profile-select">yt-dlp Profile</label>
+            <select id="profile-select">
+              <option value="">None (use custom options below)</option>
+            </select>
+            <small>Select a profile or leave as None to use custom options</small>
+          </div>
+          <div class="form-group">
             <label><input type="checkbox" id="playlist-mode" checked> Enumerate Playlists (for channels)</label>
           </div>
           <div class="form-group" id="playlist-options">
@@ -219,19 +293,190 @@
           <div class="form-group">
             <label><input type="checkbox" id="flat-mode"> Flat mode (single folder)</label>
           </div>
-          <details class="advanced-options">
-            <summary>Advanced Options</summary>
-            <div class="form-group">
-              <label for="yt-dlp-options">Custom yt-dlp options</label>
-              <textarea id="yt-dlp-options" placeholder="--format best" rows="3">-v --dateafter 20081004 -f "bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b" --windows-filenames</textarea>
-              <small>Space-separated yt-dlp command line options</small>
-            </div>
-            <div class="form-group">
-              <label for="rescrape-days">Re-scrape interval (days)</label>
-              <input type="number" id="rescrape-days" value="7" min="1">
-            </div>
-          </details>
+          <div class="form-group">
+            <label for="yt-dlp-options">Custom yt-dlp options</label>
+            <textarea id="yt-dlp-options" placeholder="--format best" rows="3">-v --dateafter 20081004 -f "bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b" --windows-filenames</textarea>
+            <small>Space-separated yt-dlp command line options (leave blank if using a profile)</small>
+          </div>
+          <div class="form-group">
+            <label for="rescrape-days">Re-scrape interval (days)</label>
+            <input type="number" id="rescrape-days" value="7" min="1">
+          </div>
           <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Profile Modal -->
+  <div id="add-profile-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add yt-dlp Profile</h2>
+        <button class="close-btn" onclick="closeAddProfileModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="add-profile-form" onsubmit="handleAddProfile(event); return false;">
+          <!-- Presets -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>Presets</h3>
+            <div class="form-group">
+              <label for="preset-select">Select a preset</label>
+              <div class="preset-selector">
+                <select id="preset-select">
+                  <option value="">-- Choose a preset --</option>
+                  <option value="plex-youtube">Plex - YouTube-Agent</option>
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="applyPreset()">Apply Preset</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- General Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>General Options</h3>
+            <div class="form-group">
+              <label for="profile-name">Profile Name</label>
+              <input type="text" id="profile-name" placeholder="e.g., Plex 1080p" required>
+            </div>
+          </div>
+
+          <!-- Output Path Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Output Path Options
+              <span class="help-icon" title="Define how downloaded files are named and organized">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank" class="docs-link">📖 Docs</a>
+            </h3>
+            <div class="form-group">
+              <label for="profile-output-template">Output Template</label>
+              <textarea id="profile-output-template" rows="2" placeholder="%(uploader)s [%(channel_id)s]/..." required></textarea>
+              <small>Use yt-dlp output template syntax. Available fields: %(uploader)s, %(channel_id)s, %(playlist_title)s, %(playlist_id)s, %(playlist_index)s, %(title)s, %(id)s, %(ext)s</small>
+            </div>
+          </div>
+
+          <!-- Format Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Format Options
+              <span class="help-icon" title="Control video/audio quality and format selection">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#format-selection" target="_blank" class="docs-link">📖 Docs</a>
+            </h3>
+            <div class="form-group">
+              <label for="profile-format">Format Selection</label>
+              <input type="text" id="profile-format" placeholder='bv*[height=1080]+ba / best'>
+              <small>yt-dlp format string. Examples: "bv*[height=1080]+ba" (1080p video + best audio), "bestvideo+bestaudio" (best quality), "worst" (smallest size)</small>
+            </div>
+            <div class="form-group">
+              <label for="profile-merge-format">Merge Output Format</label>
+              <input type="text" id="profile-merge-format" placeholder="mp4">
+              <small>Container format after merging video+audio (mp4, mkv, webm, etc.)</small>
+            </div>
+          </div>
+
+          <!-- Additional Arguments -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Additional Arguments
+              <span class="help-icon" title="Any extra yt-dlp command-line options">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#usage-and-options" target="_blank" class="docs-link">📖 All Options</a>
+            </h3>
+            <div class="form-group">
+              <label for="profile-additional-args">Extra yt-dlp Arguments</label>
+              <textarea id="profile-additional-args" rows="3" placeholder="--write-info-json --write-thumbnail"></textarea>
+              <small>Any additional yt-dlp command line options (space-separated). Examples: --write-info-json, --write-thumbnail, --dateafter 20200101, --embed-subs</small>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Create Profile</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div id="edit-profile-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Edit yt-dlp Profile</h2>
+        <button class="close-btn" onclick="closeEditProfileModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="edit-profile-form" onsubmit="handleEditProfile(event); return false;">
+          <input type="hidden" id="edit-profile-id">
+          
+          <!-- Presets -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>Presets</h3>
+            <div class="form-group">
+              <label for="edit-preset-select">Select a preset</label>
+              <div class="preset-selector">
+                <select id="edit-preset-select">
+                  <option value="">-- Choose a preset --</option>
+                  <option value="plex-youtube">Plex - YouTube-Agent</option>
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="applyEditPreset()">Apply Preset</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- General Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>General Options</h3>
+            <div class="form-group">
+              <label for="edit-profile-name">Profile Name</label>
+              <input type="text" id="edit-profile-name" placeholder="e.g., Plex 1080p" required>
+            </div>
+          </div>
+
+          <!-- Output Path Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Output Path Options
+              <span class="help-icon" title="Define how downloaded files are named and organized">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank" class="docs-link">📖 Docs</a>
+            </h3>
+            <div class="form-group">
+              <label for="edit-profile-output-template">Output Template</label>
+              <textarea id="edit-profile-output-template" rows="2" placeholder="%(uploader)s [%(channel_id)s]/..." required></textarea>
+              <small>Use yt-dlp output template syntax. Available fields: %(uploader)s, %(channel_id)s, %(playlist_title)s, %(playlist_id)s, %(playlist_index)s, %(title)s, %(id)s, %(ext)s</small>
+            </div>
+          </div>
+
+          <!-- Format Options -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Format Options
+              <span class="help-icon" title="Control video/audio quality and format selection">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#format-selection" target="_blank" class="docs-link">📖 Docs</a>
+            </h3>
+            <div class="form-group">
+              <label for="edit-profile-format">Format Selection</label>
+              <input type="text" id="edit-profile-format" placeholder='bv*[height=1080]+ba / best'>
+              <small>yt-dlp format string. Examples: "bv*[height=1080]+ba" (1080p video + best audio), "bestvideo+bestaudio" (best quality), "worst" (smallest size)</small>
+            </div>
+            <div class="form-group">
+              <label for="edit-profile-merge-format">Merge Output Format</label>
+              <input type="text" id="edit-profile-merge-format" placeholder="mp4">
+              <small>Container format after merging video+audio (mp4, mkv, webm, etc.)</small>
+            </div>
+          </div>
+
+          <!-- Additional Arguments -->
+          <div class="content-box" style="margin-bottom: 1rem;">
+            <h3>
+              Additional Arguments
+              <span class="help-icon" title="Any extra yt-dlp command-line options">?</span>
+              <a href="https://github.com/yt-dlp/yt-dlp#usage-and-options" target="_blank" class="docs-link">📖 All Options</a>
+            </h3>
+            <div class="form-group">
+              <label for="edit-profile-additional-args">Extra yt-dlp Arguments</label>
+              <textarea id="edit-profile-additional-args" rows="3" placeholder="--write-info-json --write-thumbnail"></textarea>
+              <small>Any additional yt-dlp command line options (space-separated). Examples: --write-info-json, --write-thumbnail, --dateafter 20200101, --embed-subs</small>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Save Changes</button>
         </form>
       </div>
     </div>

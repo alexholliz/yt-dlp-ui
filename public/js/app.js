@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
   setupEventListeners();
   loadHomePage();
+  loadProfilesIntoDropdowns(); // Load profiles for channel forms
   startPolling();
   
   // Modal close on background click
@@ -40,6 +41,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('add-channel-modal')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeAddChannelModal();
+  });
+  document.getElementById('playlist-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closePlaylistModal();
+  });
+  document.getElementById('add-profile-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeAddProfileModal();
+  });
+  document.getElementById('edit-profile-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeEditProfileModal();
   });
 });
 
@@ -55,6 +65,7 @@ function setupNavigation() {
       
       if (page === 'home') loadHomePage();
       if (page === 'channels') loadChannelsPage();
+      if (page === 'profiles') loadProfilesPage();
       if (page === 'config') loadConfigPage();
     });
   });
@@ -87,8 +98,12 @@ async function loadHistory() {
     const history = await api.get(`/api/downloads/recent?limit=${pageSize}&offset=${historyPage * pageSize}`);
     const tbody = document.getElementById('history-table-body');
     
+    // Calculate total pages
+    const totalVideos = await api.get('/api/stats').then(s => s.total_downloads + s.pending_downloads);
+    const totalPages = Math.max(1, Math.ceil(totalVideos / pageSize));
+    
     if (history.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No downloads yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No downloads yet</td></tr>';
       document.getElementById('history-next').disabled = true;
     } else {
       tbody.innerHTML = history.map(v => `
@@ -98,18 +113,22 @@ async function loadHistory() {
             ${v.download_status === 'failed' ? `<br><small class="error-text" title="${escapeHtml(v.error_message || 'Download failed')}">${escapeHtml(v.error_message || 'Download failed')}</small>` : ''}
           </td>
           <td>${formatDate(v.upload_date)}</td>
-          <td>${formatTimestamp(v.created_at)}</td>
           <td>
-            ${v.download_status === 'completed' ? formatTimestamp(v.downloaded_at) : '-'}
-            <span class="status-badge status-${v.download_status}">${v.download_status}</span>
+            ${v.download_status === 'completed' ? '<span class="status-badge status-completed">✓ Completed</span>' : 
+              v.download_status === 'pending' ? '<span class="status-badge status-pending">Pending</span>' :
+              v.download_status === 'downloading' ? '<span class="status-badge status-downloading">Downloading</span>' :
+              v.download_status === 'failed' ? '<span class="status-badge status-failed">✗ Failed</span>' :
+              `<span class="status-badge status-${v.download_status}">${v.download_status}</span>`}
           </td>
+          <td>${formatTimestamp(v.created_at)}</td>
+          <td>${v.download_status === 'completed' ? formatTimestamp(v.downloaded_at) : '-'}</td>
           <td>${escapeHtml(v.channel_name || 'Unknown')}</td>
         </tr>
       `).join('');
       document.getElementById('history-next').disabled = history.length < pageSize;
     }
     document.getElementById('history-prev').disabled = historyPage === 0;
-    document.getElementById('history-page-info').textContent = `Page ${historyPage + 1}`;
+    document.getElementById('history-page-info').textContent = `Page ${historyPage + 1} of ${totalPages}`;
   } catch (err) {
     console.error('Failed to load history:', err);
   }
@@ -117,9 +136,10 @@ async function loadHistory() {
 
 async function loadQueue() {
   try {
-    const [status, pendingVideos] = await Promise.all([
+    const [status, pendingVideos, failedVideos] = await Promise.all([
       api.get('/api/download/status'),
-      api.get('/api/download/queue?limit=10')
+      api.get('/api/download/queue?limit=10'),
+      api.get('/api/downloads/recent?limit=50&status=failed')
     ]);
     
     const allItems = [
@@ -136,8 +156,40 @@ async function loadQueue() {
         channel_name: v.channel_name,
         status: 'pending',
         type: 'queued'
+      })),
+      ...failedVideos.slice(0, 5).map(v => ({
+        video_id: v.video_id,
+        video_title: v.video_title,
+        channel_name: v.channel_name,
+        error_message: v.error_message,
+        status: 'failed',
+        type: 'failed'
       }))
     ];
+    
+    const queueStatus = document.getElementById('queue-status');
+    const hasPending = pendingVideos.length > 0 && status.active === 0;
+    if (hasPending) {
+      queueStatus.innerHTML = `
+        <div style="background: var(--warning); color: white; padding: 0.5rem 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          ${pendingVideos.length} videos pending • 
+          <button class="btn btn-secondary btn-small" onclick="startDownloads()" style="margin-left: 0.5rem;">Start Downloads</button>
+        </div>
+      `;
+    } else {
+      queueStatus.innerHTML = '';
+    }
+    
+    const hasFailedVideos = failedVideos.length > 0;
+    if (hasFailedVideos) {
+      const retrySection = queueStatus.innerHTML;
+      queueStatus.innerHTML = retrySection + `
+        <div style="background: var(--danger); color: white; padding: 0.5rem 1rem; border-radius: 4px; margin-bottom: 1rem;">
+          ${failedVideos.length} failed downloads • 
+          <button class="btn btn-secondary btn-small" onclick="retryFailedDownloads()" style="margin-left: 0.5rem;">Retry All Failed</button>
+        </div>
+      `;
+    }
     
     const tbody = document.getElementById('queue-table-body');
     if (allItems.length === 0) {
@@ -145,25 +197,32 @@ async function loadQueue() {
     } else {
       const start = queuePage * pageSize;
       const pageItems = allItems.slice(start, start + pageSize);
+      const totalPages = Math.ceil(allItems.length / pageSize);
       
       tbody.innerHTML = pageItems.map(item => `
-        <tr>
+        <tr onclick="viewVideo('${item.video_id}')" style="cursor: pointer;">
           <td title="${escapeHtml(item.video_id)}">${escapeHtml(item.video_title || item.video_id)}</td>
-          <td><span class="status-badge status-${item.status}">${item.status}</span></td>
+          <td>
+            ${item.status === 'completed' ? '<span class="status-badge status-completed">✓ Completed</span>' : 
+              item.status === 'pending' ? '<span class="status-badge status-pending">Pending</span>' :
+              item.status === 'downloading' ? '<span class="status-badge status-downloading">Downloading</span>' :
+              item.status === 'failed' ? '<span class="status-badge status-failed">✗ Failed</span>' :
+              `<span class="status-badge status-${item.status}">${item.status}</span>`}
+          </td>
           <td>
             ${item.progress ? `
               <div class="progress-bar"><div class="progress-fill" style="width: ${item.progress}%"></div></div>
               ${item.progress.toFixed(1)}%
-            ` : (item.status === 'pending' ? 'Waiting' : '-')}
+            ` : (item.status === 'pending' ? 'Waiting' : item.status === 'failed' ? `<span class="error-text" title="${escapeHtml(item.error_message || 'Error')}">${escapeHtml((item.error_message || 'Error').substring(0, 30))}${(item.error_message || '').length > 30 ? '...' : ''}</span>` : '-')}
           </td>
           <td>${item.channel_name || '-'}</td>
         </tr>
       `).join('');
       
       document.getElementById('queue-next').disabled = start + pageSize >= allItems.length;
+      document.getElementById('queue-page-info').textContent = `Page ${queuePage + 1} of ${totalPages}`;
     }
     document.getElementById('queue-prev').disabled = queuePage === 0;
-    document.getElementById('queue-page-info').textContent = `Page ${queuePage + 1}`;
   } catch (err) {
     console.error('Failed to load queue:', err);
   }
@@ -175,7 +234,7 @@ async function loadChannelsPage() {
     const tbody = document.getElementById('channels-table-body');
     
     if (channelStats.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No channels added yet</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No channels added yet</td></tr>';
       return;
     }
     
@@ -211,7 +270,8 @@ async function loadChannelsPage() {
           </td>
           <td>${c.pending_count || 0}</td>
           <td>${c.completed_count || 0}</td>
-          <td>-</td>
+          <td>${c.total_size ? formatSize(c.total_size) : '0 GB'}</td>
+          <td>${formatDateTime(c.last_scraped_at)}</td>
           <td>
             <label class="toggle-switch">
               <input type="checkbox" checked onchange="toggleChannel(${c.id}, this.checked)">
@@ -223,6 +283,32 @@ async function loadChannelsPage() {
     }).join('');
   } catch (err) {
     console.error('Failed to load channels:', err);
+  }
+}
+
+async function loadProfilesPage() {
+  try {
+    const profiles = await api.get('/api/profiles');
+    const tbody = document.getElementById('profiles-table-body');
+    
+    if (profiles.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No profiles created yet</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = profiles.map(p => `
+      <tr>
+        <td><strong>${escapeHtml(p.name)}</strong></td>
+        <td style="font-family: monospace; font-size: 0.85em;">${escapeHtml(p.output_template)}</td>
+        <td style="font-family: monospace; font-size: 0.85em;">${escapeHtml(p.format_selection || 'default')}</td>
+        <td>
+          <button class="btn btn-secondary btn-small" onclick="editProfile(${p.id})">Edit</button>
+          <button class="btn btn-danger btn-small" onclick="deleteProfile(${p.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load profiles:', err);
   }
 }
 
@@ -245,14 +331,58 @@ async function viewChannel(channelId) {
     document.getElementById('modal-channel-name').textContent = channel.channel_name || 'Channel';
     
     modalBody.innerHTML = `
-      <!-- Channel Settings -->
+      <!-- Playlists -->
       <div class="content-box" style="margin-bottom: 1rem;">
+        ${playlists.length === 0 ? `
+          <div class="empty-state">
+            <p>No playlists found.</p>
+            <button class="btn btn-primary" onclick="enumeratePlaylists(${channelId})">Enumerate Now</button>
+          </div>
+        ` : `
+          <div class="box-header">
+            <h3>Playlists (${playlists.length})</h3>
+            <div class="button-group">
+              <button class="btn btn-secondary btn-small" onclick="enumeratePlaylists(${channelId})">Refresh All</button>
+              <button class="btn btn-primary btn-small" onclick="downloadChannel(${channelId})">Download All</button>
+            </div>
+          </div>
+          ${playlists.map(p => `
+            <div class="playlist-item">
+              <div class="playlist-info" style="cursor: pointer;" onclick="viewPlaylist(${p.id})">
+                <h4>${escapeHtml(p.playlist_title)}</h4>
+                <small style="color: var(--text-muted);">
+                  ${p.video_count || 0} video${(p.video_count || 0) !== 1 ? 's' : ''}
+                  ${p.total_size ? ` • ${formatFileSize(p.total_size)} downloaded` : ''}
+                </small>
+              </div>
+              <div class="playlist-actions">
+                <label class="toggle-switch">
+                  <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlaylist(${p.id}, this.checked)">
+                  <span class="slider"></span>
+                </label>
+                <button class="btn btn-secondary btn-small" onclick="refreshPlaylist(${p.id}, ${channelId})" title="Refresh video count">↻</button>
+                <button class="btn btn-primary btn-small" onclick="downloadPlaylist(${p.id})">Download</button>
+              </div>
+            </div>
+          `).join('')}
+        `}
+      </div>
+
+      <!-- Channel Settings -->
+      <div class="content-box">
         <h3>Channel Settings</h3>
         <form id="edit-channel-form-${channelId}" onsubmit="saveChannelSettings(${channelId}, event); return false;">
           <div class="form-group">
             <label>Channel URL</label>
             <input type="text" value="${escapeHtml(channel.url)}" disabled style="background: var(--surface-hover); cursor: not-allowed;">
             <small>URL cannot be changed after adding</small>
+          </div>
+          <div class="form-group">
+            <label for="edit-profile-${channelId}">yt-dlp Profile</label>
+            <select id="edit-profile-${channelId}">
+              <option value="">None (use custom options below)</option>
+            </select>
+            <small>Select a profile or leave as None to use custom options</small>
           </div>
           <div class="form-group">
             <label><input type="checkbox" id="edit-playlist-mode-${channelId}" ${channel.playlist_mode === 'enumerate' ? 'checked' : ''}> Enumerate Playlists</label>
@@ -263,55 +393,25 @@ async function viewChannel(channelId) {
           <div class="form-group">
             <label><input type="checkbox" id="edit-flat-mode-${channelId}" ${channel.flat_mode ? 'checked' : ''}> Flat mode (single folder)</label>
           </div>
-          <details class="advanced-options">
-            <summary>Advanced Options</summary>
-            <div class="form-group">
-              <label for="edit-yt-dlp-options-${channelId}">Custom yt-dlp options</label>
-              <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="--format best">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
-              <small>Do NOT include -o, --merge-output-format, or --write-info-json (handled automatically)</small>
-            </div>
-            <div class="form-group">
-              <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>
-              <input type="number" id="edit-rescrape-days-${channelId}" value="${channel.rescrape_interval_days || 7}" min="1">
-            </div>
-          </details>
+          <div class="form-group">
+            <label for="edit-yt-dlp-options-${channelId}">Custom yt-dlp options</label>
+            <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="--format best">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
+            <small>Space-separated yt-dlp command line options (leave blank if using a profile)</small>
+          </div>
+          <div class="form-group">
+            <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>
+            <input type="number" id="edit-rescrape-days-${channelId}" value="${channel.rescrape_interval_days || 7}" min="1">
+          </div>
           <button type="submit" class="btn btn-primary">Save Settings</button>
         </form>
       </div>
-
-      <!-- Playlists -->
-      <div class="content-box">
-        ${playlists.length === 0 ? `
-          <div class="empty-state">
-            <p>No playlists found.</p>
-            <button class="btn btn-primary" onclick="enumeratePlaylists(${channelId})">Enumerate Now</button>
-          </div>
-        ` : `
-          <div class="box-header">
-            <h3>Playlists (${playlists.length})</h3>
-            <div class="button-group">
-              <button class="btn btn-secondary btn-small" onclick="enumeratePlaylists(${channelId})">Refresh</button>
-              <button class="btn btn-primary btn-small" onclick="downloadChannel(${channelId})">Download All</button>
-            </div>
-          </div>
-          ${playlists.map(p => `
-            <div class="playlist-item">
-              <div class="playlist-info">
-                <h4>${escapeHtml(p.playlist_title)}</h4>
-                <small style="color: var(--text-muted);">${p.video_count || 0} video${(p.video_count || 0) !== 1 ? 's' : ''}</small>
-              </div>
-              <div class="playlist-actions">
-                <label class="toggle-switch">
-                  <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlaylist(${p.id}, this.checked)">
-                  <span class="slider"></span>
-                </label>
-                <button class="btn btn-primary btn-small" onclick="downloadPlaylist(${p.id})">Download</button>
-              </div>
-            </div>
-          `).join('')}
-        `}
-      </div>
     `;
+    
+    // Load profiles into the edit dropdown after rendering
+    await loadProfilesIntoDropdowns();
+    if (channel.profile_id) {
+      document.getElementById(`edit-profile-${channelId}`).value = channel.profile_id;
+    }
   } catch (err) {
     showNotification('Failed to load channel: ' + err.message, 'error');
   }
@@ -337,15 +437,56 @@ async function viewVideo(videoId) {
         <tr><th>Uploader</th><td>${escapeHtml(video.uploader || 'Unknown')}</td></tr>
         <tr><th>Upload Date</th><td>${formatDate(video.upload_date)}</td></tr>
         <tr><th>Duration</th><td>${formatDuration(video.duration)}</td></tr>
+        <tr><th>Resolution</th><td>${escapeHtml(video.resolution || 'N/A')}</td></tr>
+        <tr><th>Frame Rate</th><td>${video.fps ? video.fps + ' FPS' : 'N/A'}</td></tr>
+        <tr><th>Video Codec</th><td>${formatVideoCodec(video.vcodec || 'N/A')}</td></tr>
+        <tr><th>Audio Codec</th><td>${formatAudioCodec(video.acodec || 'N/A')}</td></tr>
+        <tr><th>File Size</th><td>${video.file_size ? formatFileSize(video.file_size) : 'N/A'}</td></tr>
         <tr><th>Indexed</th><td>${formatTimestamp(video.created_at)}</td></tr>
         <tr><th>Downloaded</th><td>${formatTimestamp(video.downloaded_at)}</td></tr>
         <tr><th>Status</th><td><span class="status-badge status-${video.download_status}">${video.download_status}</span></td></tr>
-        <tr><th>File Path</th><td>${escapeHtml(video.file_path || 'N/A')}</td></tr>
+        ${video.download_status === 'failed' && video.error_message ? `
+          <tr><th>Error</th><td style="color: var(--danger); font-family: monospace; font-size: 0.85em;">${escapeHtml(video.error_message)}</td></tr>
+        ` : ''}
+        <tr><th>File Path</th><td style="word-break: break-all; font-family: monospace; font-size: 0.85em;">${escapeHtml(video.file_path || 'N/A')}</td></tr>
         <tr><th>URL</th><td><a href="${escapeHtml(video.video_url)}" target="_blank">${escapeHtml(video.video_url)}</a></td></tr>
       </table>
+      <div class="button-group" style="margin-top: 1rem; justify-content: flex-end;">
+        ${video.download_status === 'failed' || video.download_status === 'completed' ? `
+          <button class="btn btn-secondary" onclick="forceRedownload('${video.video_id}')">Force Redownload</button>
+        ` : ''}
+        <button class="btn btn-danger" onclick="deleteVideo('${video.video_id}')">Delete Video</button>
+      </div>
     `;
   } catch (err) {
     showNotification('Failed to load video: ' + err.message, 'error');
+  }
+}
+
+async function deleteVideo(videoId) {
+  if (!confirm('Delete this video? This will permanently delete the file from disk and remove it from the database.')) return;
+  
+  try {
+    await api.delete(`/api/videos/${videoId}`);
+    showNotification('Video and files deleted', 'success');
+    closeVideoModal();
+    loadHistory();
+    loadQueue();
+  } catch (err) {
+    showNotification('Failed to delete video: ' + err.message, 'error');
+  }
+}
+
+async function forceRedownload(videoId) {
+  if (!confirm('Force redownload this video? This will reset its status to pending.')) return;
+  
+  try {
+    await api.post(`/api/videos/${videoId}/redownload`);
+    showNotification('Video queued for redownload', 'success');
+    closeVideoModal();
+    loadQueue();
+  } catch (err) {
+    showNotification('Failed to redownload: ' + err.message, 'error');
   }
 }
 
@@ -357,6 +498,7 @@ async function handleAddChannel(e) {
   const autoAddPlaylists = document.getElementById('auto-add-playlists').checked;
   const ytDlpOptions = document.getElementById('yt-dlp-options').value.trim();
   const rescrapeDays = parseInt(document.getElementById('rescrape-days').value);
+  const profileId = document.getElementById('profile-select').value || null;
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
@@ -366,7 +508,8 @@ async function handleAddChannel(e) {
     const result = await api.post('/api/channels', {
       url, playlist_mode: playlistMode ? 'enumerate' : 'flat',
       flat_mode: flatMode, auto_add_new_playlists: autoAddPlaylists,
-      yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays
+      yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays,
+      profile_id: profileId
     });
     
     closeAddChannelModal();
@@ -408,9 +551,10 @@ async function handleAddChannel(e) {
 
 async function enumeratePlaylists(channelId) {
   try {
-    await api.post(`/api/channels/${channelId}/enumerate`);
+    showNotification('Refreshing all playlists (this may take a moment)...', 'info');
+    const result = await api.post(`/api/channels/${channelId}/enumerate`);
     await viewChannel(channelId);
-    showNotification('Playlists enumerated!', 'success');
+    showNotification(`Refreshed ${result.playlists.length} playlists!`, 'success');
   } catch (err) {
     showNotification('Failed: ' + err.message, 'error');
   }
@@ -424,6 +568,7 @@ async function saveChannelSettings(channelId, e) {
   const flatMode = document.getElementById(`edit-flat-mode-${channelId}`).checked;
   const ytDlpOptions = document.getElementById(`edit-yt-dlp-options-${channelId}`).value.trim();
   const rescrapeDays = parseInt(document.getElementById(`edit-rescrape-days-${channelId}`).value);
+  const profileId = document.getElementById(`edit-profile-${channelId}`)?.value || null;
   
   try {
     await api.put(`/api/channels/${channelId}`, {
@@ -431,7 +576,8 @@ async function saveChannelSettings(channelId, e) {
       flat_mode: flatMode,
       auto_add_new_playlists: autoAdd,
       yt_dlp_options: ytDlpOptions || null,
-      rescrape_interval_days: rescrapeDays
+      rescrape_interval_days: rescrapeDays,
+      profile_id: profileId
     });
     
     showNotification('Channel settings saved!', 'success');
@@ -485,6 +631,39 @@ async function loadSchedulerStatus() {
   }
 }
 
+async function startDownloads() {
+  try {
+    await api.post('/api/download/start');
+    showNotification('Downloads started', 'success');
+    loadQueue();
+  } catch (err) {
+    showNotification('Failed to start downloads: ' + err.message, 'error');
+  }
+}
+
+async function retryFailedDownloads() {
+  if (!confirm('Retry all failed downloads?')) return;
+  
+  try {
+    await api.post('/api/download/retry-failed');
+    showNotification('Failed downloads queued for retry', 'success');
+    loadQueue();
+  } catch (err) {
+    showNotification('Failed to retry downloads: ' + err.message, 'error');
+  }
+}
+
+async function refreshPlaylist(playlistId, channelId) {
+  try {
+    const result = await api.post(`/api/playlists/${playlistId}/enumerate`);
+    showNotification(`Updated: ${result.video_count} videos found`, 'success');
+    // Refresh the channel modal to show updated count
+    viewChannel(channelId);
+  } catch (err) {
+    showNotification('Failed to refresh playlist: ' + err.message, 'error');
+  }
+}
+
 async function startScheduler() {
   const days = parseInt(document.getElementById('scheduler-interval').value);
   try {
@@ -510,14 +689,13 @@ async function loadCookies() {
   try {
     const result = await api.get('/api/cookies');
     document.getElementById('cookies-content').value = result.content || '';
-    if (result.exists) {
-      showNotification('Cookies loaded successfully', 'success');
-    } else {
-      showNotification('No cookies file found', 'info');
-    }
+    // Don't show notifications on initial load, only on explicit actions
   } catch (err) {
     console.error('Failed to load cookies:', err);
-    showNotification('Failed to load cookies: ' + err.message, 'error');
+    // Only show notification if there's an actual error
+    if (err.message && !err.message.includes('404')) {
+      showNotification('Failed to load cookies: ' + err.message, 'error');
+    }
   }
 }
 
@@ -569,6 +747,113 @@ async function deleteCookies() {
   }
 }
 
+// YouTube API Key Management
+async function saveYouTubeApiKey() {
+  const apiKey = document.getElementById('youtube-api-key').value.trim();
+  if (!apiKey) {
+    showNotification('Please enter an API key', 'error');
+    return;
+  }
+  
+  try {
+    await api.post('/api/youtube-api/key', { apiKey });
+    showNotification('YouTube API key saved successfully', 'success');
+    await loadYouTubeApiQuota();
+  } catch (err) {
+    showNotification('Failed to save API key: ' + err.message, 'error');
+  }
+}
+
+async function testYouTubeApiKey() {
+  const apiKey = document.getElementById('youtube-api-key').value.trim();
+  if (!apiKey) {
+    showNotification('Please enter an API key', 'error');
+    return;
+  }
+  
+  try {
+    const result = await api.post('/api/youtube-api/test', { apiKey });
+    if (result.valid) {
+      showNotification('API key is valid! ✓', 'success');
+      if (result.quota) {
+        displayQuotaStatus(result.quota);
+      }
+    } else {
+      showNotification('API key is invalid: ' + (result.error || 'Unknown error'), 'error');
+    }
+  } catch (err) {
+    showNotification('API key test failed: ' + err.message, 'error');
+  }
+}
+
+async function deleteYouTubeApiKey() {
+  if (!confirm('Delete YouTube API key? Channel enumeration will use yt-dlp web scraping instead.')) {
+    return;
+  }
+  
+  try {
+    await api.delete('/api/youtube-api/key');
+    document.getElementById('youtube-api-key').value = '';
+    document.getElementById('youtube-api-quota-status').innerHTML = '';
+    showNotification('YouTube API key deleted', 'success');
+  } catch (err) {
+    showNotification('Failed to delete API key: ' + err.message, 'error');
+  }
+}
+
+async function loadYouTubeApiQuota() {
+  try {
+    const quota = await api.get('/api/youtube-api/quota');
+    displayQuotaStatus(quota);
+  } catch (err) {
+    console.error('Failed to load YouTube API quota:', err);
+  }
+}
+
+function displayQuotaStatus(quota) {
+  const statusDiv = document.getElementById('youtube-api-quota-status');
+  const percentUsed = (quota.used / quota.limit * 100).toFixed(1);
+  const resetTime = new Date(quota.resetTime).toLocaleString();
+  
+  let colorClass = 'success';
+  if (percentUsed > 80) colorClass = 'error';
+  else if (percentUsed > 50) colorClass = 'warning';
+  
+  statusDiv.innerHTML = `
+    <div style="padding: 0.75rem; background: var(--background); border-radius: 4px; border: 1px solid var(--border);">
+      <strong>Quota Status:</strong> ${quota.used} / ${quota.limit} units used (${percentUsed}%)<br>
+      <small style="color: var(--text-muted);">
+        Remaining: ${quota.remaining} units • Resets: ${resetTime}
+      </small>
+      ${quota.remaining < 100 ? '<br><small style="color: var(--error);">⚠️ Low quota - will fallback to yt-dlp soon</small>' : ''}
+    </div>
+  `;
+}
+
+async function loadConfigPage() {
+  // Load existing API key status
+  try {
+    const keyStatus = await api.get('/api/youtube-api/key');
+    if (keyStatus.hasKey) {
+      document.getElementById('youtube-api-key').placeholder = `API key saved (${keyStatus.keyLength} characters)`;
+      await loadYouTubeApiQuota();
+    }
+  } catch (err) {
+    console.error('Failed to load API key status:', err);
+  }
+  
+  // Auto-load cookies if they exist
+  try {
+    const cookies = await api.get('/api/cookies');
+    if (cookies.content) {
+      document.getElementById('cookies-content').value = cookies.content;
+    }
+  } catch (err) {
+    // No cookies file exists yet, that's fine
+    console.debug('No cookies file found (this is normal for new installs)');
+  }
+}
+
 function showAddChannelModal() {
   document.getElementById('add-channel-modal').style.display = 'flex';
   document.getElementById('channel-url').focus();
@@ -586,6 +871,226 @@ function closeChannelModal() {
 
 function closeVideoModal() {
   document.getElementById('video-modal').style.display = 'none';
+}
+
+async function viewPlaylist(playlistId) {
+  const modal = document.getElementById('playlist-modal');
+  const modalBody = document.getElementById('playlist-modal-body');
+  
+  modalBody.innerHTML = '<p class="loading">Loading playlist videos...</p>';
+  modal.style.display = 'flex';
+  
+  try {
+    const response = await api.get(`/api/playlists/${playlistId}/videos`);
+    const playlist = response.playlist;
+    const videos = response.videos;
+    
+    document.getElementById('modal-playlist-title').textContent = playlist.playlist_title || 'Playlist';
+    
+    if (videos.length === 0) {
+      modalBody.innerHTML = '<p class="empty-state">No videos in this playlist</p>';
+      return;
+    }
+    
+    modalBody.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${videos.map(v => `
+            <tr onclick="viewVideo('${v.video_id}')" style="cursor: pointer;">
+              <td>${escapeHtml(v.video_title)}</td>
+              <td>
+                ${v.download_status === 'completed' ? '<span class="status-badge status-completed">✓ Downloaded</span>' : 
+                  v.download_status === 'pending' ? '<span class="status-badge status-pending">Pending</span>' :
+                  v.download_status === 'downloading' ? '<span class="status-badge status-downloading">Downloading</span>' :
+                  v.download_status === 'failed' ? '<span class="status-badge status-failed">✗ Failed</span>' :
+                  '<span style="color: var(--text-muted);">—</span>'}
+              </td>
+              <td>${v.file_size ? formatFileSize(v.file_size) : '—'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="button-group" style="margin-top: 1rem; justify-content: flex-end;">
+        <button class="btn btn-danger" onclick="deleteAllPlaylistVideos(${playlistId})">Delete All Videos</button>
+      </div>
+    `;
+  } catch (err) {
+    showNotification('Failed to load playlist: ' + err.message, 'error');
+  }
+}
+
+async function deleteAllPlaylistVideos(playlistId) {
+  if (!confirm('Delete ALL videos in this playlist? This will permanently delete all files from disk, remove them from the database, and delete the playlist folder.')) return;
+  
+  try {
+    const result = await api.delete(`/api/playlists/${playlistId}/videos`);
+    showNotification(result.message, 'success');
+    closePlaylistModal();
+    loadHistory();
+    loadStats();
+    // Refresh channel view if it's open
+    const channelModal = document.getElementById('channel-modal');
+    if (channelModal.style.display === 'flex') {
+      const channelId = result.channel_id;
+      if (channelId) viewChannel(channelId);
+    }
+  } catch (err) {
+    showNotification('Failed to delete videos: ' + err.message, 'error');
+  }
+}
+
+function closePlaylistModal() {
+  document.getElementById('playlist-modal').style.display = 'none';
+}
+
+function showAddProfileModal() {
+  document.getElementById('add-profile-modal').style.display = 'flex';
+  document.getElementById('profile-name').focus();
+}
+
+function closeAddProfileModal() {
+  document.getElementById('add-profile-modal').style.display = 'none';
+  document.getElementById('add-profile-form').reset();
+}
+
+function applyPreset() {
+  const preset = document.getElementById('preset-select').value;
+  
+  if (preset === 'plex-youtube') {
+    document.getElementById('profile-name').value = 'Plex - YouTube-Agent';
+    document.getElementById('profile-output-template').value = '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
+    document.getElementById('profile-format').value = 'bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b';
+    document.getElementById('profile-merge-format').value = 'mp4';
+    document.getElementById('profile-additional-args').value = '-v --dateafter 20081004 --write-info-json --windows-filenames';
+    showNotification('Plex preset applied', 'success');
+  }
+}
+
+async function handleAddProfile(e) {
+  e.preventDefault();
+  
+  const profileData = {
+    name: document.getElementById('profile-name').value.trim(),
+    output_template: document.getElementById('profile-output-template').value.trim(),
+    format_selection: document.getElementById('profile-format').value.trim() || null,
+    merge_output_format: document.getElementById('profile-merge-format').value.trim() || null,
+    additional_args: document.getElementById('profile-additional-args').value.trim() || null
+  };
+  
+  try {
+    await api.post('/api/profiles', profileData);
+    showNotification('Profile created successfully', 'success');
+    closeAddProfileModal();
+    loadProfilesPage();
+  } catch (err) {
+    showNotification('Failed to create profile: ' + err.message, 'error');
+  }
+}
+
+async function deleteProfile(profileId) {
+  if (!confirm('Delete this profile? Channels using this profile will revert to custom options.')) return;
+  
+  try {
+    await api.delete(`/api/profiles/${profileId}`);
+    showNotification('Profile deleted', 'success');
+    loadProfilesPage();
+  } catch (err) {
+    showNotification('Failed to delete profile: ' + err.message, 'error');
+  }
+}
+
+async function editProfile(profileId) {
+  try {
+    const profile = await api.get(`/api/profiles/${profileId}`);
+    
+    // Populate the edit form
+    document.getElementById('edit-profile-id').value = profile.id;
+    document.getElementById('edit-profile-name').value = profile.name;
+    document.getElementById('edit-profile-output-template').value = profile.output_template;
+    document.getElementById('edit-profile-format').value = profile.format_selection || '';
+    document.getElementById('edit-profile-merge-format').value = profile.merge_output_format || '';
+    document.getElementById('edit-profile-additional-args').value = profile.additional_args || '';
+    
+    // Show the modal
+    document.getElementById('edit-profile-modal').style.display = 'flex';
+  } catch (err) {
+    showNotification('Failed to load profile: ' + err.message, 'error');
+  }
+}
+
+function closeEditProfileModal() {
+  document.getElementById('edit-profile-modal').style.display = 'none';
+  document.getElementById('edit-profile-form').reset();
+}
+
+function applyEditPreset() {
+  const preset = document.getElementById('edit-preset-select').value;
+  if (preset === 'plex-youtube') {
+    document.getElementById('edit-profile-name').value = 'Plex - YouTube-Agent';
+    document.getElementById('edit-profile-output-template').value = '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
+    document.getElementById('edit-profile-format').value = 'bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b';
+    document.getElementById('edit-profile-merge-format').value = 'mp4';
+    document.getElementById('edit-profile-additional-args').value = '-v --dateafter 20081004 --write-info-json --windows-filenames';
+    showNotification('Plex preset applied', 'success');
+  }
+}
+
+async function handleEditProfile(e) {
+  e.preventDefault();
+  
+  const profileId = document.getElementById('edit-profile-id').value;
+  const profileData = {
+    name: document.getElementById('edit-profile-name').value.trim(),
+    output_template: document.getElementById('edit-profile-output-template').value.trim(),
+    format_selection: document.getElementById('edit-profile-format').value.trim() || null,
+    merge_output_format: document.getElementById('edit-profile-merge-format').value.trim() || null,
+    additional_args: document.getElementById('edit-profile-additional-args').value.trim() || null
+  };
+  
+  try {
+    await api.put(`/api/profiles/${profileId}`, profileData);
+    showNotification('Profile updated successfully', 'success');
+    closeEditProfileModal();
+    loadProfilesPage();
+    loadProfilesIntoDropdowns(); // Refresh dropdowns in case name changed
+  } catch (err) {
+    showNotification('Failed to update profile: ' + err.message, 'error');
+  }
+}
+
+async function loadProfilesIntoDropdowns() {
+  try {
+    const profiles = await api.get('/api/profiles');
+    
+    // Update add channel profile dropdown
+    const addChannelSelect = document.getElementById('profile-select');
+    if (addChannelSelect) {
+      const currentValue = addChannelSelect.value;
+      addChannelSelect.innerHTML = '<option value="">None (use custom options below)</option>' +
+        profiles.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+      if (currentValue) addChannelSelect.value = currentValue;
+    }
+    
+    // Update all edit channel profile dropdowns (select elements in channel modals only)
+    document.querySelectorAll('select[id^="edit-profile-"]').forEach(select => {
+      // Skip the edit profile modal selects
+      if (select.id === 'edit-preset-select') return;
+      
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">None (use custom options below)</option>' +
+        profiles.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+      if (currentValue) select.value = currentValue;
+    });
+  } catch (err) {
+    console.error('Failed to load profiles:', err);
+  }
 }
 
 function prevHistoryPage() {
@@ -658,6 +1163,99 @@ function formatSize(bytes) {
   if (!bytes) return '0 GB';
   const gb = bytes / (1024 ** 3);
   return gb.toFixed(2) + ' GB';
+}
+
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const k = 1024;
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + units[i];
+}
+
+function formatDateTime(timestamp) {
+  if (!timestamp) return 'Never';
+  
+  // If timestamp is a number (Unix timestamp in seconds), convert to milliseconds
+  let date;
+  if (typeof timestamp === 'number') {
+    date = new Date(timestamp * 1000);
+  } else {
+    // If it's a string (ISO date), parse it directly
+    date = new Date(timestamp);
+  }
+  
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  // Less than 1 minute ago
+  if (diffMins < 1) return 'Just now';
+  // Less than 1 hour ago
+  if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+  // Less than 24 hours ago
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  // Less than 7 days ago
+  if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+  // More than 7 days ago - show date
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatVideoCodec(codec) {
+  if (!codec || codec === 'N/A') return 'N/A';
+  
+  const codecMap = {
+    'avc1': 'H.264',
+    'avc': 'H.264',
+    'h264': 'H.264',
+    'hev1': 'H.265/HEVC',
+    'hvc1': 'H.265/HEVC',
+    'hevc': 'H.265/HEVC',
+    'vp9': 'VP9',
+    'vp09': 'VP9',
+    'vp8': 'VP8',
+    'vp08': 'VP8',
+    'av01': 'AV1',
+    'av1': 'AV1',
+    'none': 'None'
+  };
+  
+  // Try to match the beginning of the codec string
+  for (const [key, name] of Object.entries(codecMap)) {
+    if (codec.toLowerCase().startsWith(key)) {
+      return `${name} (${codec})`;
+    }
+  }
+  
+  return codec; // Return as-is if unknown
+}
+
+function formatAudioCodec(codec) {
+  if (!codec || codec === 'N/A') return 'N/A';
+  
+  const codecMap = {
+    'mp4a': 'AAC',
+    'aac': 'AAC',
+    'opus': 'Opus',
+    'vorbis': 'Vorbis',
+    'mp3': 'MP3',
+    'ac3': 'AC-3',
+    'eac3': 'E-AC-3',
+    'dts': 'DTS',
+    'flac': 'FLAC',
+    'none': 'None'
+  };
+  
+  // Try to match the beginning of the codec string
+  for (const [key, name] of Object.entries(codecMap)) {
+    if (codec.toLowerCase().startsWith(key)) {
+      return `${name} (${codec})`;
+    }
+  }
+  
+  return codec; // Return as-is if unknown
 }
 
 function showNotification(message, type = 'info') {

@@ -1,8 +1,8 @@
 # yt-dlp-ui Project State & History
 
 **Last Updated:** 2026-01-31  
-**Version:** 1.0.0-beta  
-**Status:** Fully Functional
+**Version:** 1.1.0-beta  
+**Status:** Fully Functional with Enhanced Features
 
 > **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
 > This document MUST be kept up-to-date as development continues.  
@@ -14,6 +14,12 @@
 > - Move completed roadmap items to "Implemented Features"
 > - Update the "Last Updated" date at the top
 > 
+> **Git Configuration for this Repository:**
+> - Git user name: `alexholliz`
+> - Git user email: `alex.holliz@gmail.com`
+> - GitHub repository: `alexholliz/yt-dlp-ui`
+> - These credentials MUST be used for all git operations in this project
+> 
 > This ensures continuity for future AI sessions and human developers.
 
 ---
@@ -22,17 +28,26 @@
 
 ### 🎯 Project Overview
 
-**yt-dlp-ui** is a self-hosted web application for managing YouTube downloads via yt-dlp with intelligent playlist handling. It runs as a Docker container and provides a web interface for managing channels, playlists, and downloads.
+**yt-dlp-ui** is a self-hosted web application for managing YouTube downloads via yt-dlp with intelligent playlist handling. It runs as a Docker container and provides a web interface for managing channels, playlists, profiles, and downloads with comprehensive metadata tracking.
 
 ### ✅ Implemented Features
 
 #### Core Functionality
 - **Smart URL Detection**: Automatically detects and handles channels, playlists, single videos, and `/playlists` URLs
-- **Playlist Enumeration**: Enumerates all playlists from a YouTube channel
+- **Playlist Enumeration**: Enumerates all playlists from a YouTube channel with real video counts
+- **Individual Playlist Refresh**: Refresh video counts per playlist or all at once
 - **Selective Downloading**: Enable/disable individual playlists for download
 - **Download Queue System**: Manages multiple concurrent downloads with progress tracking
 - **Automatic Scheduling**: Periodic checking for new content with configurable intervals
-- **Download Archive**: Tracks downloaded videos in database to avoid duplicates
+- **Download Archive**: Tracks downloaded videos to avoid duplicates, syncs with deletions
+- **Graceful Shutdown**: Waits up to 3 minutes for downloads to complete, cleans up partial files
+
+#### yt-dlp Profiles System (NEW)
+- **Profile Management**: Create reusable download profiles with custom settings
+- **Presets**: "Plex - YouTube-Agent" preset for quick setup
+- **Profile Assignment**: Assign profiles to channels (add/edit)
+- **Profile Components**: Output template, format selection, merge format, additional args
+- **Flexible Override**: Use profiles OR custom options per channel
 
 #### URL Types Supported
 1. **Channel URLs**: `@channelname`, `/channel/ID`, `/c/name`, `/user/name`
@@ -41,23 +56,68 @@
 4. **Single Video URLs**: `/watch?v=...` or `youtu.be/...` (immediate download)
 
 #### User Interface
-- **Sidebar Navigation**: Home, Channels, Config pages
+- **Sidebar Navigation**: Home, Channels, yt-dlp Profiles, Config pages
 - **Home Page (Dashboard)**:
-  - Stats boxes: Total Channels, Total Downloads, Library Size
-  - Media History table (paginated, 5 per page)
-  - Current Queue table (paginated, 5 per page)
-- **Channels Page**: Table with all channels, download counts, enable/disable toggles
-- **Config Page**: Scheduler controls, cookie management, add content form
-- **Modals**: Channel details with playlists, video metadata viewer
+  - Stats boxes: Total Channels, Total Downloads, Library Size (live calculated)
+  - Media History table (paginated, "Page X of Y" format)
+  - Current Queue table with Start Downloads and Retry Failed buttons
+  - Clickable videos to view detailed metadata
+- **Channels Page**: 
+  - Table with all channels, download counts, total size per channel
+  - Click channel to view playlists and settings
+  - Add Channel modal with profile selection
+- **yt-dlp Profiles Page** (NEW):
+  - Manage reusable download profiles
+  - Preset system (currently: Plex - YouTube-Agent)
+  - Create/Edit/Delete profiles
+- **Modals**:
+  - Channel details with playlists (clickable) and editable settings
+  - Playlist viewer with video list and bulk delete
+  - Video metadata viewer with delete/redownload buttons
+  - Add Channel modal with profile dropdown
+  - Add Profile modal with preset system
 - **Auto-refresh**: Live updates every 5 seconds for stats and progress
+
+#### Video Management
+- **Detailed Metadata Tracking**:
+  - Upload date, duration, file size, file path
+  - Resolution (e.g., 1920x1080), frame rate (e.g., 60 FPS)
+  - Video codec (e.g., H.264), audio codec (e.g., AAC)
+  - Formatted codec display: "H.264 (avc1.64002a)"
+- **Video Actions**:
+  - Delete video (removes file, metadata, thumbnail, archive entry)
+  - Force redownload (resets status, removes from archive)
+  - View detailed metadata modal
+- **Playlist Actions**:
+  - View all videos in playlist with status and size
+  - Individual refresh button per playlist
+  - Bulk delete all videos in playlist (includes folder cleanup)
+- **Queue Management**:
+  - View pending, active, and failed downloads
+  - Start downloads manually if queue is stuck
+  - Retry all failed downloads with one click
+  - Clickable queue items to view details
+  - Failed downloads show error messages
 
 #### Download Management
 - **Output Organization**: 
   - Organized mode: `Uploader [ID]/Playlist [PL_ID]/Index - Title [ID].ext`
   - Flat mode: `Uploader [ID]/Title [ID].ext`
-- **Format**: Defaults to 1080p MP4 with audio merge
+  - Uses playlist URL with index selection for proper metadata
+- **Format**: Defaults to 1080p MP4 with audio merge (configurable via profiles)
 - **Metadata**: Saves video info JSON and thumbnails
 - **Concurrency**: Configurable parallel workers (default: 2)
+- **File Path Capture**: Tracks actual file paths using `--print after_move:filepath`
+- **Smart Archive Sync**: Removes deleted videos from .downloaded archive
+
+#### Cookie Management
+- **Upload via UI**: Paste Netscape-format cookies
+- **Format Validation**: Checks cookie format before saving
+- **Live Testing**: Test cookies against YouTube age-restricted content
+- **Help System**: Tooltips explain cookie workflow
+- **Renamed Button**: "Load from cookies.txt" (was "Load Current")
+- **Cookie Cleaning Required**: If exporting from browser extensions, ensure ONLY YouTube cookies (not Unraid, Reddit, etc.)
+- **JavaScript Runtime**: Requires Node.js runtime (`--js-runtimes node`) and challenge solver (`--remote-components ejs:github`) for age-restricted videos
 
 #### Security & Configuration
 - **HTTP Basic Authentication**: Optional username/password protection
@@ -68,25 +128,27 @@
 
 #### Database
 - **SQLite with WAL mode**: Better concurrency support
-- **Tables**: channels, playlists, videos
-- **Statistics**: Real-time stats calculation
+- **Tables**: channels, playlists, videos, profiles (NEW)
+- **Statistics**: Real-time stats calculation from file_size column
 - **Pagination**: Efficient querying for large datasets
+- **Migrations**: Automatic schema updates on startup
+- **Video Metadata Columns**: resolution, fps, vcodec, acodec, file_path, file_size, error_message
 
 ### 📁 Project Structure
 
 ```
 yt-dlp-ui/
 ├── src/
-│   ├── server.js           # Express API server (379 lines)
-│   ├── database.js         # SQLite operations with WAL mode (328 lines)
-│   ├── ytdlp-service.js    # yt-dlp wrapper with URL detection (270 lines)
-│   ├── download-manager.js # Queue & download orchestration (209 lines)
+│   ├── server.js           # Express API server (~600 lines)
+│   ├── database.js         # SQLite operations with profiles (~480 lines)
+│   ├── ytdlp-service.js    # yt-dlp wrapper with metadata capture (~340 lines)
+│   ├── download-manager.js # Queue & graceful shutdown (~280 lines)
 │   ├── scheduler.js        # Automatic periodic downloads (72 lines)
 │   └── logger.js           # Winston logger configuration (51 lines)
 ├── public/
-│   ├── index.html          # Sidebar-based UI with 3 pages
+│   ├── index.html          # Sidebar UI with 4 pages & modals
 │   ├── css/styles.css      # Pinchflat-inspired dark theme
-│   └── js/app.js           # Frontend with pagination & live updates
+│   └── js/app.js           # Frontend with video management (~900 lines)
 ├── Dockerfile              # Alpine + Node + yt-dlp + ffmpeg
 ├── docker-compose.yml      # Local testing & deployment
 ├── unraid-template.xml     # Unraid Community Apps template
@@ -140,7 +202,7 @@ The project is fully containerized and ready for:
 ```sql
 id, url, channel_id, channel_name, playlist_mode, flat_mode,
 auto_add_new_playlists, yt_dlp_options, rescrape_interval_days,
-last_scraped_at, created_at, updated_at
+profile_id, last_scraped_at, created_at, updated_at
 ```
 
 **Playlists Table:**
@@ -153,7 +215,14 @@ video_count, enabled, last_scraped_at, created_at, updated_at
 ```sql
 id, channel_id, playlist_id, video_id, video_title, video_url,
 uploader, upload_date, duration, playlist_index, download_status,
-downloaded_at, file_path, created_at, updated_at
+downloaded_at, file_path, file_size, error_message, 
+resolution, fps, vcodec, acodec, created_at, updated_at
+```
+
+**Profiles Table (NEW):**
+```sql
+id, name, output_template, format_selection, merge_output_format,
+additional_args, created_at, updated_at
 ```
 
 ### 🐛 Known Issues & Limitations
@@ -169,9 +238,10 @@ downloaded_at, file_path, created_at, updated_at
 
 3. **Progress Parsing**: yt-dlp progress output varies, parsing is approximate
 
-4. **Single Download Queue**: Sequential processing (one video at a time per worker)
+4. **Playlist Preview Counts**: YouTube /playlists tab only shows preview (2-3 videos)
+   - **Solution**: Individual refresh or download gets real count
 
-**All other known bugs have been fixed as of 2026-01-30!**
+**All critical bugs fixed as of 2026-01-31!**
 
 ### 📈 Performance Characteristics
 
@@ -218,8 +288,9 @@ This is a functional YouTube download manager built with Node.js, Express, and S
 
 4. **Active Issues to Be Aware Of**:
    - Channel name sometimes not captured during enumeration (has fallback)
-   - Library size calculation not implemented (shows 0)
    - sql.js requires `.save()` after all DB operations
+   - **SQL.js undefined handling**: Must convert undefined to null explicitly - SQL.js throws "Wrong API use" error on undefined values
+   - **Playlist video counts**: YouTube preview shows 2-3 videos, real count requires enumeration
 
 5. **Testing Setup**:
    - Docker container on port 8189
@@ -322,6 +393,30 @@ User wanted to create a yt-dlp web UI inspired by Pinchflat but with better play
 - Database migrations for file_size and error_message columns
 - Enhanced API endpoints with richer video data
 
+**Phase 6: Metadata Tracking & Video Management (Current)**
+- Fixed download bug: SQL.js undefined values causing crashes
+- Fixed playlist video count persistence (don't overwrite on refresh)
+- Individual playlist refresh buttons
+- File path and metadata extraction from .info.json
+- Added video metadata: resolution, fps, vcodec, acodec
+- Formatted codec display: "H.264 (avc1.64002a)"
+- Fixed output template: Use playlist URL with --playlist-items INDEX
+- Graceful shutdown with .part file cleanup
+- Delete video: File + metadata + thumbnail + archive entry
+- Force redownload: Reset status + remove from archive
+- Playlist detail view: Click to see all videos with status/size
+- Queue management: Start downloads, retry failed, clickable items
+- Download archive sync: Removes deleted videos from .downloaded
+- Pagination improvements: "Page X of Y" format
+- Playlist bulk delete: Delete all videos + playlist folder
+- Fixed cookie notification spam
+- **yt-dlp Profiles System**:
+  - Create/manage reusable download profiles
+  - "Plex - YouTube-Agent" preset
+  - Assign profiles to channels
+  - Profile database table + full CRUD API
+  - Profile UI with presets and form sections
+
 ### Key Technical Decisions & Rationale
 
 1. **sql.js over better-sqlite3**
@@ -348,6 +443,26 @@ User wanted to create a yt-dlp web UI inspired by Pinchflat but with better play
    - **Why**: yt-dlp /playlists tab doesn't always return channel metadata
    - **Trade-off**: Uses URL parsing as fallback (@username)
    - **Acceptable because**: Better than no name at all
+
+6. **Playlist URL with Index Selection** (NEW)
+   - **Why**: Individual video URLs lack playlist context (filename becomes "NA [NA]/NA")
+   - **Solution**: Download via playlist URL with `--playlist-items INDEX`
+   - **Result**: Proper filenames with playlist_title, playlist_id, playlist_index
+
+7. **Download Archive Sync** (NEW)
+   - **Why**: yt-dlp skips videos in .downloaded archive
+   - **Solution**: Remove from archive when deleting or redownloading
+   - **Result**: Deletions and redownloads work correctly
+
+8. **Metadata from .info.json** (NEW)
+   - **Why**: yt-dlp saves rich metadata we should display
+   - **Solution**: Read .info.json after download completes
+   - **Result**: Resolution, FPS, codecs available in UI
+
+9. **Graceful Shutdown** (NEW)
+   - **Why**: Docker stop was leaving partial .part files
+   - **Solution**: Wait 3 minutes for downloads, clean up on timeout
+   - **Result**: Clean shutdowns without artifacts
 
 ### User's Workflow Example
 
@@ -381,11 +496,11 @@ This app replicates that workflow but with:
 
 The database currently contains:
 - 1 channel: `@TheOneHollis` 
-- 3 playlists enumerated:
-  - "TheOneHollis - Playlists" (meta-playlist)
-  - "Final Fantasy XII - The Zodiac Age" (2 videos)
-  - "Ratchet and Clank 2 Developer Commentary" (2 videos)
-- 0 videos downloaded (testing enumeration only so far)
+- 2 playlists enumerated:
+  - "Final Fantasy XII - The Zodiac Age" (6 videos downloaded)
+  - "Ratchet and Clank 2 Developer Commentary" (51 videos total, 0 downloaded)
+- 6 videos fully downloaded with complete metadata (resolution, fps, codecs, file paths)
+- All features tested and working: delete, redownload, playlist refresh, bulk operations
 
 ---
 
@@ -437,10 +552,12 @@ When the user asks you to continue working on this project, you should:
    - Then rebuild container for production
 
 5. **Important Code Locations**:
-   - **API Routes**: `src/server.js` lines 60-370
-   - **Database Methods**: `src/database.js` lines 100-320
-   - **yt-dlp Integration**: `src/ytdlp-service.js` lines 29-270
-   - **UI Page Rendering**: `public/js/app.js` lines 80-250
+   - **API Routes**: `src/server.js` lines 60-600
+   - **Database Methods**: `src/database.js` lines 100-480
+   - **yt-dlp Integration**: `src/ytdlp-service.js` lines 29-350
+   - **Download Queue**: `src/download-manager.js` lines 15-310
+   - **UI Page Rendering**: `public/js/app.js` lines 80-950
+   - **Profile Management**: `public/js/app.js` lines 273-925
    - **Sidebar Nav**: `public/index.html` lines 14-30
 
 6. **Testing Checklist**:
@@ -504,42 +621,132 @@ open http://localhost:8189
 
 ### Recent Changes (Last 5 Commits)
 
-```
-99e2cbd Fix known bugs: library size, queue display, error handling, and modal clicks
-e1ecd29 Add database migration for video_count column
-f60f08d Add comprehensive project state and continuation guide
-58206da Add video count display for playlists
-38bc885 Fix playlist enumeration and add channel name fallback
-```
+> **Note**: Run `git log --oneline -10` to see latest commits
 
-> **Note**: When continuing development, update this section with latest commits using:  
-> `git log --oneline -5`
+**Latest Session Changes (2026-01-31):**
+- **IMPLEMENTED: CI/CD Pipeline with GitHub Actions** (NEW FEATURE)
+  - Created `.github/workflows/build-and-test.yml` for automated builds
+  - Builds and publishes multi-arch Docker images (amd64, arm64) to ghcr.io
+  - Runs tests on every push and pull request
+  - Automatic tagging: `latest`, `main`, and commit SHA tags
+  - Uses build cache for faster subsequent builds (2-3 min vs 10 min)
+  - Only builds on `main` pushes (PRs only run tests)
+  - Created CI_CD_GUIDE.md with full documentation
+  - Created PIPELINE_SETUP.md for quick setup reference
+  - Updated README.md with CI badge and contributing section
+- **FIXED: Cookie test now uses same flags as downloads** (CRITICAL FIX)
+  - Added `--js-runtimes node` and `--remote-components ejs:github` to cookie test
+  - Removed `-f worst` format specification that was causing failures
+  - Test now properly validates cookies for age-restricted videos
+  - Added better error logging and account detection in test results
+- **FIXED: Large cookie file support** (CRITICAL FIX)
+  - Increased Express body parser limit from 100kb to 10mb
+  - Supports cookie files with 500+ lines from browser extensions
+  - Fixed "PayloadTooLargeError" when pasting large cookie files
+- **FIXED: Age-restricted video downloads with cookies** (CRITICAL FIX)
+  - Added `--js-runtimes node` to enable Node.js for JavaScript challenge solving
+  - Added `--remote-components ejs:github` to download YouTube's challenge solver scripts
+  - These flags are required for YouTube's n-parameter challenges since 2026
+  - Cookies now properly authenticated: "Found YouTube account cookies", "Detected YouTube Premium subscription"
+- **FIXED: Download queue not processing** (CRITICAL FIX)
+  - Modified `startDownloads()` to load pending videos from database when queue is empty
+  - Created `buildDownloadOptions()` helper to construct download options from channel/playlist
+  - "Start Downloads" and "Retry Failed" buttons now work correctly
+- **FIXED: Status badge line breaks** (UI FIX)
+  - Added `white-space: nowrap` and `display: inline-block` to status badges
+  - Set `min-width: 120px` on Status columns to prevent wrapping
+  - Status badges now stay on single line when resizing browser window
+- **Implemented YouTube Data API v3 support** (optional speed enhancement)
+  - Created youtube-api-service.js for API integration
+  - Added API key management UI on Config page
+  - Added quota tracking (10,000 units/day, resets midnight PT)
+  - Automatic fallback to yt-dlp when quota exceeded or no key
+  - Speeds up channel/playlist enumeration significantly
+  - Backend endpoints for key save/test/delete/quota
+- Implemented yt-dlp profiles system (database + API + UI)
+- Added edit profile functionality with full modal and preset support
+- Fixed profile dropdown selector bug (was selecting non-select elements)
+- Added yt-dlp documentation links and tooltips to profile modals
+- Enhanced help text with examples for format selection and output templates
+- Reorganized channel settings: moved profile selector to top, removed advanced options dropdown
+- Added "Last Scraped" column to channels table with relative time formatting
+- Created formatDateTime() helper for user-friendly time display
+- Fixed formatDateTime() to handle Unix timestamps (seconds → milliseconds conversion)
+- Added TZ=America/Los_Angeles to docker-compose for testing
+- Added video metadata tracking (resolution, fps, codecs)
+- Fixed playlist video count persistence
+- Added individual and bulk playlist refresh
+- Implemented graceful shutdown with .part cleanup
+- Added delete video with file cleanup
+- Added force redownload functionality
+- Created playlist detail viewer
+- Added queue management (start, retry failed)
+- Fixed download archive sync on deletions
+- Updated pagination to "Page X of Y" format
+- Added playlist bulk delete with folder cleanup
+- Fixed cookie notification spam
+- Fixed SQL.js undefined value handling
+- Fixed output template using playlist URL with index
+- Improved UI text alignment (added left padding/margins)
+- Styled dropdowns to match other inputs
+- Removed accidentally committed 'dy' file
 
 ---
 
 ## Future Roadmap
 
+### Recently Completed (Moved from Roadmap)
+
+- ✅ **Library Size Calculation**: Implemented with file_size column, shows live calculated size on dashboard and per channel
+- ✅ **Channel Size Display**: Shows total download size per channel in channels table
+- ✅ **Video Management**: Delete videos, force redownload, view detailed metadata
+- ✅ **Playlist Management**: View playlist videos, refresh counts, bulk delete operations
+- ✅ **Queue Controls**: Start downloads manually, retry failed downloads, view failed items
+- ✅ **Metadata Tracking**: Resolution, FPS, video/audio codecs, file paths, file sizes
+- ✅ **Graceful Shutdown**: Clean exits with partial file cleanup
+- ✅ **Download Archive Sync**: Removes deleted videos from archive file
+- ✅ **Pagination Improvements**: "Page X of Y" format throughout UI
+- ✅ **Edit Profile Functionality**: Edit existing profiles with full form and preset support
+- ✅ **UI Text Alignment**: Added left padding to labels, headings, and help text for better readability
+- ✅ **YouTube Data API v3 Support**: Optional API key for 5-10x faster channel enumeration with automatic yt-dlp fallback
+
 ### Planned Features (Not Yet Implemented)
 
-1. **Library Size Calculation**
-   - Scan downloads directory
-   - Calculate total size per channel
-   - Show in stats and channel table
+1. **Profile Integration with Downloads** (IN PROGRESS)
+   - Use profile settings in download-manager.js
+   - Apply output template from profile
+   - Apply format selection from profile
+   - Test end-to-end with channel downloads
 
-2. **Channel Enable/Disable**
-   - Functional toggle (currently just visual)
-   - Affects scheduler processing
-   - Store in database
+2. **Additional Profile Presets**
+   - "720p Space Saver" preset
+   - "Max Quality" preset
+   - "Audio Only" preset
 
 3. **Video Thumbnails**
    - Display in history table
-   - Show in video metadata modal
+   - Show in video metadata modal  
    - Lazy load for performance
 
-4. **Bulk Operations**
-   - Select multiple playlists at once
-   - Enable/disable multiple channels
-   - Batch delete
+4. **Advanced Filtering**
+   - Filter videos by channel, playlist, or status
+   - Search videos by title
+   - Date range filtering
+
+5. **Batch Channel Management**
+   - Import channels from text file
+   - Export channel list
+   - Bulk enable/disable channels
+
+6. **Download Statistics**
+   - Charts for download history
+   - Bandwidth usage tracking
+   - Success/failure rates
+
+7. **Mobile Responsive UI**
+   - Optimize sidebar for mobile
+   - Touch-friendly controls
+   - Responsive tables
 
 5. **Search & Filtering**
    - Search videos by title

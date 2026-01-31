@@ -1,5 +1,7 @@
 # yt-dlp-ui
 
+[![Build and Test](https://github.com/yourusername/yt-dlp-ui/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/yourusername/yt-dlp-ui/actions/workflows/build-and-test.yml)
+
 A self-hosted web UI for managing yt-dlp downloads with intelligent playlist handling.
 
 ## Features
@@ -16,15 +18,7 @@ A self-hosted web UI for managing yt-dlp downloads with intelligent playlist han
 
 ## Installation
 
-### Docker Compose (Recommended)
-
-```bash
-git clone https://github.com/yourusername/yt-dlp-ui.git
-cd yt-dlp-ui
-docker-compose up -d
-```
-
-### Docker CLI
+### Using Pre-built Image (Recommended)
 
 ```bash
 docker run -d \
@@ -33,7 +27,33 @@ docker run -d \
   -v /path/to/config:/config \
   -v /path/to/downloads:/downloads \
   -e TZ=America/New_York \
-  yt-dlp-ui:latest
+  ghcr.io/yourusername/yt-dlp-ui:latest
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  yt-dlp-ui:
+    image: ghcr.io/yourusername/yt-dlp-ui:latest
+    container_name: yt-dlp-ui
+    ports:
+      - "8189:8189"
+    volumes:
+      - /path/to/config:/config
+      - /path/to/downloads:/downloads
+    environment:
+      - TZ=America/New_York
+    restart: unless-stopped
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/yourusername/yt-dlp-ui.git
+cd yt-dlp-ui
+docker-compose up -d
 ```
 
 ### Local Development
@@ -102,8 +122,26 @@ Configure automatic downloads to check for new content periodically:
 
 - [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
 - [Development Guide](DEVELOPMENT.md) - Architecture and API docs
+- [CI/CD Guide](CI_CD_GUIDE.md) - Pipeline setup and deployment
 - [Features Complete](FEATURES_COMPLETE.md) - Full feature list
 - [MVP Complete](MVP_COMPLETE.md) - Initial release notes
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes and test thoroughly
+4. Push to your fork and submit a pull request
+5. Wait for review and approval
+
+**Note**: Pull requests require:
+- Passing CI tests
+- Code review approval from maintainers
+- Up-to-date with `main` branch
+
+See [CI_CD_GUIDE.md](CI_CD_GUIDE.md) for pipeline details.
 
 ## Technology Stack
 
