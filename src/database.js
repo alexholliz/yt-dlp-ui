@@ -178,6 +178,29 @@ class DB {
     } catch (err) {
       console.warn('Migration check for channels failed:', err.message);
     }
+
+    // Migration: Add SponsorBlock options to channels
+    try {
+      const result = this.db.exec("PRAGMA table_info(channels)");
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes('sponsorblock_enabled')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_enabled BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added sponsorblock_enabled column to channels table');
+      }
+      if (!columns.includes('sponsorblock_mode')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_mode TEXT DEFAULT 'mark'");
+        this.save();
+        console.log('Migration: Added sponsorblock_mode column to channels table');
+      }
+      if (!columns.includes('sponsorblock_categories')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_categories TEXT");
+        this.save();
+        console.log('Migration: Added sponsorblock_categories column to channels table');
+      }
+    } catch (err) {
+      console.warn('Migration check for SponsorBlock failed:', err.message);
+    }
   }
 
   // Profiles
@@ -237,8 +260,11 @@ class DB {
   // Channels
   addChannel(url, options = {}) {
     const stmt = this.db.prepare(`
-      INSERT INTO channels (url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, rescrape_interval_days, profile_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO channels (
+        url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, 
+        rescrape_interval_days, profile_id, sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run([
       url,
@@ -247,7 +273,10 @@ class DB {
       options.auto_add_new_playlists ? 1 : 0,
       options.yt_dlp_options || null,
       options.rescrape_interval_days || 7,
-      options.profile_id || null
+      options.profile_id || null,
+      options.sponsorblock_enabled ? 1 : 0,
+      options.sponsorblock_mode || 'mark',
+      options.sponsorblock_categories || null
     ]);
     const result = this.db.exec('SELECT last_insert_rowid() as id');
     this.save();
@@ -301,6 +330,18 @@ class DB {
     if (data.profile_id !== undefined) {
       fields.push('profile_id = ?');
       values.push(data.profile_id);
+    }
+    if (data.sponsorblock_enabled !== undefined) {
+      fields.push('sponsorblock_enabled = ?');
+      values.push(data.sponsorblock_enabled ? 1 : 0);
+    }
+    if (data.sponsorblock_mode !== undefined) {
+      fields.push('sponsorblock_mode = ?');
+      values.push(data.sponsorblock_mode);
+    }
+    if (data.sponsorblock_categories !== undefined) {
+      fields.push('sponsorblock_categories = ?');
+      values.push(data.sponsorblock_categories);
     }
 
     fields.push('updated_at = strftime("%s", "now")');

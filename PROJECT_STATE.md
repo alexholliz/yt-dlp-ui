@@ -109,6 +109,11 @@
 - **Concurrency**: Configurable parallel workers (default: 2)
 - **File Path Capture**: Tracks actual file paths using `--print after_move:filepath`
 - **Smart Archive Sync**: Removes deleted videos from .downloaded archive
+- **SponsorBlock Integration** (NEW):
+  - Enable/disable per channel
+  - Mark sponsored segments as chapters OR remove them from video
+  - 7 category types: Sponsor, Intro, Outro, Self-promotion, Interaction, Preview, Non-music
+  - Automatic integration with yt-dlp's `--sponsorblock-mark` and `--sponsorblock-remove` flags
 
 #### Cookie Management
 - **Upload via UI**: Paste Netscape-format cookies
@@ -624,6 +629,24 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-01-31):**
+- **IMPLEMENTED: SponsorBlock Integration** (NEW FEATURE)
+  - Added SponsorBlock options to Add Channel and Edit Channel forms
+  - Database schema updated with 3 new columns: sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
+  - Automatic database migration for existing installations
+  - Two modes: Mark segments as chapters OR Remove segments from video
+  - 7 category types supported: sponsor, intro, outro, selfpromo, interaction, preview, music_offtopic
+  - Integrated with download-manager to inject `--sponsorblock-mark` or `--sponsorblock-remove` flags
+  - UI toggles to show/hide SponsorBlock settings
+  - Categories selectable via checkboxes
+  - Created unit tests for SponsorBlock functionality (test/sponsorblock.test.js)
+  - Created database tests (test/database.test.js)
+- **IMPLEMENTED: Real Unit Tests** (NEW FEATURE)
+  - Added test suite using Node.js built-in test runner
+  - Database operation tests
+  - SponsorBlock integration tests  
+  - Updated CI/CD workflow to run real tests (removed continue-on-error)
+  - Tests now REQUIRED to pass before builds
+  - Updated Dockerfile to include test/ directory
 - **IMPLEMENTED: CI/CD Pipeline with GitHub Actions** (NEW FEATURE)
   - Created `.github/workflows/build-and-test.yml` for automated builds
   - Builds and publishes multi-arch Docker images (amd64, arm64) to ghcr.io

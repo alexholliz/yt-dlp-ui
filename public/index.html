@@ -293,6 +293,39 @@
           <div class="form-group">
             <label><input type="checkbox" id="flat-mode"> Flat mode (single folder)</label>
           </div>
+
+          <!-- SponsorBlock Options -->
+          <div class="content-box" style="margin: 1rem 0;">
+            <h3>SponsorBlock Options</h3>
+            <div class="form-group">
+              <label><input type="checkbox" id="sponsorblock-enabled"> Enable SponsorBlock</label>
+              <small>Automatically handle sponsored segments and other video sections</small>
+            </div>
+            <div id="sponsorblock-settings" style="display: none;">
+              <div class="form-group">
+                <label for="sponsorblock-mode">Behavior</label>
+                <select id="sponsorblock-mode">
+                  <option value="mark">Mark segments as chapters</option>
+                  <option value="remove">Remove segments</option>
+                </select>
+                <small>Mark: Add chapter markers. Remove: Cut segments from video (requires ffmpeg)</small>
+              </div>
+              <div class="form-group">
+                <label>Categories to process:</label>
+                <div style="margin-left: 0.5rem;">
+                  <label><input type="checkbox" class="sponsorblock-category" value="sponsor" checked> Sponsor</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="intro"> Intro</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="outro"> Outro/Credits</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="selfpromo"> Self-promotion</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="interaction"> Interaction (Subscribe/Like)</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="preview"> Preview/Recap</label>
+                  <label><input type="checkbox" class="sponsorblock-category" value="music_offtopic"> Non-music (in music videos)</label>
+                </div>
+                <small>Select which types of segments to mark or remove</small>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="yt-dlp-options">Custom yt-dlp options</label>
             <textarea id="yt-dlp-options" placeholder="--format best" rows="3">-v --dateafter 20081004 -f "bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b" --windows-filenames</textarea>

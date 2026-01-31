@@ -233,6 +233,25 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
+    // Build SponsorBlock arguments if enabled
+    let sponsorblockArgs = '';
+    if (channel.sponsorblock_enabled && channel.sponsorblock_categories) {
+      const mode = channel.sponsorblock_mode || 'mark';
+      const categories = channel.sponsorblock_categories;
+      
+      if (mode === 'mark') {
+        sponsorblockArgs = `--sponsorblock-mark ${categories}`;
+      } else if (mode === 'remove') {
+        sponsorblockArgs = `--sponsorblock-remove ${categories}`;
+      }
+    }
+
+    // Combine custom args with SponsorBlock args
+    const customArgs = [channel.yt_dlp_options, sponsorblockArgs]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || null;
+
     return {
       outputPath: this.downloadsPath,
       outputTemplate,
@@ -242,7 +261,7 @@ class DownloadManager {
       noRestrictFilenames: true,
       writeThumbnail: true,
       downloadArchive: path.join(this.downloadsPath, '.downloaded'),
-      customArgs: channel.yt_dlp_options,
+      customArgs,
       playlistMetadata: {
         playlist_title: playlist.playlist_title,
         playlist_id: playlist.playlist_id

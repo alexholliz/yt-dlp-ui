@@ -18,6 +18,7 @@ RUN npm ci --only=production
 # Copy application files
 COPY src/ ./src/
 COPY public/ ./public/
+COPY test/ ./test/
 
 # Create necessary directories
 RUN mkdir -p /config /downloads

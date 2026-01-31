@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test || echo 'Tests passed'",
+    "test": "node --test test/*.test.js",
     "lint": "echo 'Linting not configured yet'"
   },
   "keywords": [

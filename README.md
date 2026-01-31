@@ -8,8 +8,11 @@ A self-hosted web UI for managing yt-dlp downloads with intelligent playlist han
 
 - **Smart URL Handling**: Channels, playlists, single videos, and `/playlists` URLs
 - **Intelligent Playlist Management**: Enumerate and selectively download playlists from channels
+- **SponsorBlock Integration**: Skip or mark sponsored segments, intros, outros, and more
+- **yt-dlp Profiles**: Reusable download configurations with presets
+- **YouTube Data API v3**: Optional API key for faster channel enumeration
 - **Flexible Organization**: Flat or playlist-organized directory structures  
-- **Download Manager**: Queue system with progress tracking
+- **Download Manager**: Queue system with progress tracking and retry functionality
 - **Automatic Scheduling**: Periodic checking for new content
 - **Cookie Support**: Manage cookies through UI for authenticated downloads
 - **Advanced Options**: Full yt-dlp command line parameter support

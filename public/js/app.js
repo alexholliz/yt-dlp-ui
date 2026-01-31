@@ -76,6 +76,9 @@ function setupEventListeners() {
   document.getElementById('playlist-mode').addEventListener('change', (e) => {
     document.getElementById('playlist-options').style.display = e.target.checked ? 'block' : 'none';
   });
+  document.getElementById('sponsorblock-enabled').addEventListener('change', (e) => {
+    document.getElementById('sponsorblock-settings').style.display = e.target.checked ? 'block' : 'none';
+  });
 }
 
 async function loadHomePage() {
@@ -393,6 +396,38 @@ async function viewChannel(channelId) {
           <div class="form-group">
             <label><input type="checkbox" id="edit-flat-mode-${channelId}" ${channel.flat_mode ? 'checked' : ''}> Flat mode (single folder)</label>
           </div>
+
+          <!-- SponsorBlock Options -->
+          <div class="content-box" style="margin: 1rem 0;">
+            <h3>SponsorBlock Options</h3>
+            <div class="form-group">
+              <label><input type="checkbox" id="edit-sponsorblock-enabled-${channelId}" ${channel.sponsorblock_enabled ? 'checked' : ''}> Enable SponsorBlock</label>
+              <small>Automatically handle sponsored segments and other video sections</small>
+            </div>
+            <div id="edit-sponsorblock-settings-${channelId}" style="display: ${channel.sponsorblock_enabled ? 'block' : 'none'};">
+              <div class="form-group">
+                <label for="edit-sponsorblock-mode-${channelId}">Behavior</label>
+                <select id="edit-sponsorblock-mode-${channelId}">
+                  <option value="mark" ${channel.sponsorblock_mode === 'mark' ? 'selected' : ''}>Mark segments as chapters</option>
+                  <option value="remove" ${channel.sponsorblock_mode === 'remove' ? 'selected' : ''}>Remove segments</option>
+                </select>
+                <small>Mark: Add chapter markers. Remove: Cut segments from video (requires ffmpeg)</small>
+              </div>
+              <div class="form-group">
+                <label>Categories to process:</label>
+                <div style="margin-left: 0.5rem;">
+                  ${['sponsor', 'intro', 'outro', 'selfpromo', 'interaction', 'preview', 'music_offtopic'].map(cat => {
+                    const categories = (channel.sponsorblock_categories || '').split(',');
+                    const checked = categories.includes(cat) ? 'checked' : '';
+                    const labels = { sponsor: 'Sponsor', intro: 'Intro', outro: 'Outro/Credits', selfpromo: 'Self-promotion', interaction: 'Interaction (Subscribe/Like)', preview: 'Preview/Recap', music_offtopic: 'Non-music (in music videos)' };
+                    return `<label><input type="checkbox" class="edit-sponsorblock-category-${channelId}" value="${cat}" ${checked}> ${labels[cat]}</label>`;
+                  }).join('')}
+                </div>
+                <small>Select which types of segments to mark or remove</small>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="edit-yt-dlp-options-${channelId}">Custom yt-dlp options</label>
             <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="--format best">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
@@ -412,6 +447,12 @@ async function viewChannel(channelId) {
     if (channel.profile_id) {
       document.getElementById(`edit-profile-${channelId}`).value = channel.profile_id;
     }
+    
+    // Add SponsorBlock toggle handler for edit form
+    document.getElementById(`edit-sponsorblock-enabled-${channelId}`).addEventListener('change', function(e) {
+      const settings = document.getElementById(`edit-sponsorblock-settings-${channelId}`);
+      settings.style.display = e.target.checked ? 'block' : 'none';
+    });
   } catch (err) {
     showNotification('Failed to load channel: ' + err.message, 'error');
   }
@@ -499,6 +540,12 @@ async function handleAddChannel(e) {
   const ytDlpOptions = document.getElementById('yt-dlp-options').value.trim();
   const rescrapeDays = parseInt(document.getElementById('rescrape-days').value);
   const profileId = document.getElementById('profile-select').value || null;
+  
+  // SponsorBlock options
+  const sponsorblockEnabled = document.getElementById('sponsorblock-enabled').checked;
+  const sponsorblockMode = document.getElementById('sponsorblock-mode').value;
+  const categoryCheckboxes = document.querySelectorAll('.sponsorblock-category:checked');
+  const sponsorblockCategories = Array.from(categoryCheckboxes).map(cb => cb.value).join(',');
 
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
@@ -509,7 +556,10 @@ async function handleAddChannel(e) {
       url, playlist_mode: playlistMode ? 'enumerate' : 'flat',
       flat_mode: flatMode, auto_add_new_playlists: autoAddPlaylists,
       yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays,
-      profile_id: profileId
+      profile_id: profileId,
+      sponsorblock_enabled: sponsorblockEnabled,
+      sponsorblock_mode: sponsorblockMode,
+      sponsorblock_categories: sponsorblockCategories || null
     });
     
     closeAddChannelModal();
@@ -570,6 +620,12 @@ async function saveChannelSettings(channelId, e) {
   const rescrapeDays = parseInt(document.getElementById(`edit-rescrape-days-${channelId}`).value);
   const profileId = document.getElementById(`edit-profile-${channelId}`)?.value || null;
   
+  // SponsorBlock options
+  const sponsorblockEnabled = document.getElementById(`edit-sponsorblock-enabled-${channelId}`).checked;
+  const sponsorblockMode = document.getElementById(`edit-sponsorblock-mode-${channelId}`).value;
+  const categoryCheckboxes = document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`);
+  const sponsorblockCategories = Array.from(categoryCheckboxes).map(cb => cb.value).join(',');
+  
   try {
     await api.put(`/api/channels/${channelId}`, {
       playlist_mode: playlistMode ? 'enumerate' : 'flat',
@@ -577,7 +633,10 @@ async function saveChannelSettings(channelId, e) {
       auto_add_new_playlists: autoAdd,
       yt_dlp_options: ytDlpOptions || null,
       rescrape_interval_days: rescrapeDays,
-      profile_id: profileId
+      profile_id: profileId,
+      sponsorblock_enabled: sponsorblockEnabled,
+      sponsorblock_mode: sponsorblockMode,
+      sponsorblock_categories: sponsorblockCategories || null
     });
     
     showNotification('Channel settings saved!', 'success');
