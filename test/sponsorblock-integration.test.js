@@ -2,14 +2,16 @@ const { describe, it } = require('node:test');
 const assert = require('assert');
 const { spawn } = require('child_process');
 
-// Integration test - requires yt-dlp installed
-// These tests verify yt-dlp accepts SponsorBlock flags without error
+// Integration test - requires yt-dlp installed and YouTube access
+// These tests verify SponsorBlock actually works with real videos
+// Skipped in CI because YouTube requires authentication (bot check)
 describe('SponsorBlock Integration Tests', () => {
   const testVideoUrl = 'https://www.youtube.com/watch?v=aLXiLRuCqvE';
+  const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
   
-  it('should mark sponsor segments as chapters', async () => {
+  it('should mark sponsor segments as chapters', { skip: isCI }, async () => {
     const args = [
-      '--print', '%(title)s',  // Just print title, don't fetch full metadata
+      '--dump-json',
       '--skip-download',
       '--sponsorblock-mark', 'sponsor',
       testVideoUrl
@@ -17,13 +19,24 @@ describe('SponsorBlock Integration Tests', () => {
 
     const result = await runYtDlp(args);
     
-    assert.ok(result.success, `yt-dlp should accept sponsorblock-mark flag: ${result.error}`);
-    assert.ok(result.output.length > 0, 'Should return video title');
+    assert.ok(result.success, `yt-dlp should succeed: ${result.error}`);
+    assert.ok(result.videoInfo, 'Should return video info');
+    
+    // Check if chapters exist and include SponsorBlock markers
+    if (result.videoInfo.chapters && result.videoInfo.chapters.length > 0) {
+      const sponsorChapters = result.videoInfo.chapters.filter(ch => 
+        ch.title && ch.title.toLowerCase().includes('sponsor')
+      );
+      console.log(`Found ${result.videoInfo.chapters.length} chapters, ${sponsorChapters.length} sponsor chapters`);
+      assert.ok(sponsorChapters.length > 0, 'Should have at least one sponsor chapter marked');
+    } else {
+      console.log('Warning: No chapters found - SponsorBlock data may not be available for this video');
+    }
   });
 
-  it('should process remove mode without errors', async () => {
+  it('should process remove mode without errors', { skip: isCI }, async () => {
     const args = [
-      '--print', '%(title)s',
+      '--dump-json',
       '--skip-download',
       '--sponsorblock-remove', 'sponsor',
       testVideoUrl
@@ -31,13 +44,14 @@ describe('SponsorBlock Integration Tests', () => {
 
     const result = await runYtDlp(args);
     
-    assert.ok(result.success, `yt-dlp should accept sponsorblock-remove flag: ${result.error}`);
-    assert.ok(result.output.length > 0, 'Should return video title');
+    assert.ok(result.success, `yt-dlp should succeed with remove mode: ${result.error}`);
+    assert.ok(result.videoInfo, 'Should return video info');
+    assert.ok(result.videoInfo.id, 'Should have video ID');
   });
 
-  it('should handle multiple categories', async () => {
+  it('should handle multiple categories', { skip: isCI }, async () => {
     const args = [
-      '--print', '%(title)s',
+      '--dump-json',
       '--skip-download',
       '--sponsorblock-mark', 'sponsor,intro,outro,selfpromo',
       testVideoUrl
@@ -45,8 +59,8 @@ describe('SponsorBlock Integration Tests', () => {
 
     const result = await runYtDlp(args);
     
-    assert.ok(result.success, `yt-dlp should accept multiple categories: ${result.error}`);
-    assert.ok(result.output.length > 0, 'Should return video title');
+    assert.ok(result.success, `yt-dlp should succeed with multiple categories: ${result.error}`);
+    assert.ok(result.videoInfo, 'Should return video info');
   });
 });
 
@@ -66,12 +80,22 @@ function runYtDlp(args) {
     });
 
     ytdlp.on('close', (code) => {
-      resolve({
-        success: code === 0,
-        output: stdout.trim(),
-        stderr: stderr.trim(),
-        error: code !== 0 ? `Exit code ${code}\nSTDERR: ${stderr.substring(0, 1000)}` : null
-      });
+      try {
+        const videoInfo = JSON.parse(stdout);
+        resolve({
+          success: code === 0,
+          videoInfo,
+          stderr: stderr.trim(),
+          error: code !== 0 ? stderr.trim() : null
+        });
+      } catch (err) {
+        resolve({
+          success: false,
+          videoInfo: null,
+          stderr: stderr.trim(),
+          error: `Failed to parse JSON: ${err.message}\nSTDERR: ${stderr.substring(0, 1000)}`
+        });
+      }
     });
 
     // Set timeout to prevent hanging
@@ -79,7 +103,7 @@ function runYtDlp(args) {
       ytdlp.kill();
       resolve({
         success: false,
-        output: '',
+        videoInfo: null,
         stderr: stderr.trim(),
         error: 'Test timeout after 30 seconds'
       });

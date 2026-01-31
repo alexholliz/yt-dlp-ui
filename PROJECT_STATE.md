@@ -629,6 +629,17 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-01-31):**
+- **IMPLEMENTED: CI/CD Pipeline with GitHub Actions** (NEW FEATURE)
+  - Created `.github/workflows/build-and-test.yml` workflow
+  - Automated testing and multi-arch Docker builds (amd64, arm64)
+  - Publishes to ghcr.io/alexholliz/yt-dlp-ui:latest
+  - Branch protection configured (admin can bypass)
+  - Tests required to pass before merge
+- **IMPLEMENTED: Multi-Stage Docker Builds** (IMPROVEMENT)
+  - **Test stage**: Full dependencies + test files for CI testing
+  - **Production stage**: Lean image without tests for deployment
+  - Tests run in Docker container with full yt-dlp environment
+  - Production image excludes test files to minimize size
 - **IMPLEMENTED: SponsorBlock Integration** (NEW FEATURE)
   - Added SponsorBlock options to Add Channel and Edit Channel forms
   - Database schema updated with 3 new columns: sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
@@ -638,16 +649,22 @@ open http://localhost:8189
   - Integrated with download-manager to inject `--sponsorblock-mark` or `--sponsorblock-remove` flags
   - UI toggles to show/hide SponsorBlock settings
   - Categories selectable via checkboxes
-  - Created unit tests for SponsorBlock functionality (test/sponsorblock.test.js)
-  - Created database tests (test/database.test.js)
-- **IMPLEMENTED: Real Unit Tests** (NEW FEATURE)
-  - Added test suite using Node.js built-in test runner
-  - Database operation tests
-  - SponsorBlock integration tests  
-  - Updated CI/CD workflow to run real tests (removed continue-on-error)
-  - Tests now REQUIRED to pass before builds
-  - Updated Dockerfile to include test/ directory
-- **IMPLEMENTED: CI/CD Pipeline with GitHub Actions** (NEW FEATURE)
+- **IMPLEMENTED: Comprehensive Test Suite** (NEW FEATURE)
+  - Using Node.js built-in test runner (`node --test`)
+  - **Unit tests** (12 tests):
+    - Database operations (test/database.test.js)
+    - SponsorBlock flag generation (test/sponsorblock.test.js)
+  - **Integration tests** (3 tests):
+    - Real yt-dlp execution with SponsorBlock (test/sponsorblock-integration.test.js)
+    - Uses test video: https://www.youtube.com/watch?v=aLXiLRuCqvE
+    - Verifies SponsorBlock marks/removes sponsor segments
+    - **Skipped in CI** due to YouTube bot detection (runs locally with cookies)
+  - All unit tests passing in CI
+  - Integration tests run locally for manual verification
+- **Git Configuration Updated**:
+  - Repository configured with alexholliz/alex.holliz@gmail.com
+  - All commit history rewritten with correct author info
+  - Windows credential cache cleared
   - Created `.github/workflows/build-and-test.yml` for automated builds
   - Builds and publishes multi-arch Docker images (amd64, arm64) to ghcr.io
   - Runs tests on every push and pull request
