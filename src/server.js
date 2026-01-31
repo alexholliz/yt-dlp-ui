@@ -458,7 +458,7 @@ db.ready.then(() => {
       }
 
       // Test against a known age-restricted video
-      const testVideoUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'; // Can be any video
+      const testVideoUrl = 'https://www.youtube.com/watch?v=X30kr6v6ibM'; // Can be any video
       const result = await ytdlp.testCookies(testVideoUrl);
       
       res.json(result);

@@ -76,74 +76,82 @@ class DownloadManager {
   }
 
   async downloadPlaylist(playlistId) {
-    const playlist = this.db.getPlaylist(playlistId);
-    if (!playlist || !playlist.enabled) {
-      throw new Error('Playlist not found or not enabled');
+    try {
+      const playlist = this.db.getPlaylist(playlistId);
+      if (!playlist || !playlist.enabled) {
+        throw new Error('Playlist not found or not enabled');
+      }
+
+      const channel = this.db.getChannel(playlist.channel_id);
+      if (!channel) {
+        throw new Error('Channel not found');
+      }
+
+      // Enumerate videos in playlist
+      logger.info(`Enumerating videos in playlist: ${playlist.playlist_title}`);
+      const videos = await this.ytdlp.enumeratePlaylistVideos(playlist.playlist_url);
+      logger.info(`Found ${videos.length} videos in playlist`);
+
+      // Add videos to database
+      for (const video of videos) {
+        this.db.addVideo({
+          channel_id: playlist.channel_id,
+          playlist_id: playlistId,
+          video_id: video.video_id,
+          video_title: video.video_title,
+          video_url: video.video_url,
+          uploader: video.uploader,
+          upload_date: video.upload_date,
+          duration: video.duration,
+          playlist_index: video.playlist_index,
+          download_status: 'pending'
+        });
+      }
+
+      // Get pending videos
+      const pendingVideos = this.db.getVideosByPlaylist(playlistId)
+        .filter(v => v.download_status === 'pending');
+      
+      logger.info(`${pendingVideos.length} videos pending download`);
+
+      // Build download options
+      const outputTemplate = channel.flat_mode
+        ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
+        : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
+
+      const downloadOptions = {
+        outputPath: this.downloadsPath,
+        outputTemplate,
+        format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
+        mergeOutputFormat: 'mp4',
+        writeInfoJson: true,
+        noRestrictFilenames: true,
+        writeThumbnail: true,
+        downloadArchive: path.join(this.downloadsPath, '.downloaded'),
+        customArgs: channel.yt_dlp_options
+      };
+
+      // Queue videos for download
+      for (const video of pendingVideos) {
+        this.queue.push({
+          videoId: video.video_id,
+          playlistId: playlistId,
+          channelId: channel.id,
+          url: video.video_url,
+          options: downloadOptions
+        });
+      }
+
+      // Start processing if not already running
+      if (!this.isProcessing) {
+        this.startDownloads();
+      }
+
+      return { queued: pendingVideos.length };
+    } catch (err) {
+      logger.error(`Failed to download playlist ${playlistId}:`, err.message, err.stack);
+      throw err;
     }
-
-    const channel = this.db.getChannel(playlist.channel_id);
-    if (!channel) {
-      throw new Error('Channel not found');
-    }
-
-    // Enumerate videos in playlist
-    logger.info(`Enumerating videos in playlist: ${playlist.playlist_title}`);
-    const videos = await this.ytdlp.enumeratePlaylistVideos(playlist.playlist_url);
-
-    // Add videos to database
-    for (const video of videos) {
-      this.db.addVideo({
-        channel_id: playlist.channel_id,
-        playlist_id: playlistId,
-        video_id: video.video_id,
-        video_title: video.video_title,
-        video_url: video.video_url,
-        uploader: video.uploader,
-        upload_date: video.upload_date,
-        duration: video.duration,
-        playlist_index: video.playlist_index,
-        download_status: 'pending'
-      });
-    }
-
-    // Get pending videos
-    const pendingVideos = this.db.getVideosByPlaylist(playlistId)
-      .filter(v => v.download_status === 'pending');
-
-    // Build download options
-    const outputTemplate = channel.flat_mode
-      ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
-      : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
-
-    const downloadOptions = {
-      outputPath: this.downloadsPath,
-      outputTemplate,
-      format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
-      mergeOutputFormat: 'mp4',
-      writeInfoJson: true,
-      noRestrictFilenames: true,
-      writeThumbnail: true,
-      downloadArchive: path.join(this.downloadsPath, '.downloaded'),
-      customArgs: channel.yt_dlp_options
-    };
-
-    // Queue videos for download
-    for (const video of pendingVideos) {
-      this.queue.push({
-        videoId: video.video_id,
-        playlistId: playlistId,
-        channelId: channel.id,
-        url: video.video_url,
-        options: downloadOptions
-      });
-    }
-
-    // Start processing if not already running
-    if (!this.isProcessing) {
-      this.startDownloads();
-    }
-
-    return { queued: pendingVideos.length };
   }
 
   async downloadChannel(channelId) {
