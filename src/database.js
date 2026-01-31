@@ -101,6 +101,19 @@ class DB {
       CREATE INDEX IF NOT EXISTS idx_videos_playlist ON videos(playlist_id);
       CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(download_status);
     `);
+    
+    // Migration: Add video_count column if it doesn't exist
+    try {
+      const result = this.db.exec("PRAGMA table_info(playlists)");
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes('video_count')) {
+        this.db.run("ALTER TABLE playlists ADD COLUMN video_count INTEGER DEFAULT 0");
+        this.save();
+        console.log('Migration: Added video_count column to playlists table');
+      }
+    } catch (err) {
+      console.warn('Migration check failed:', err.message);
+    }
   }
 
   // Channels
