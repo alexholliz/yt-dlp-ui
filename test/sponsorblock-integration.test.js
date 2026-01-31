@@ -10,8 +10,6 @@ describe('SponsorBlock Integration Tests', () => {
     const args = [
       '--dump-json',
       '--skip-download',
-      '--js-runtimes', 'node',
-      '--remote-components', 'ejs:github',
       '--sponsorblock-mark', 'sponsor',
       testVideoUrl
     ];
@@ -39,8 +37,6 @@ describe('SponsorBlock Integration Tests', () => {
     const args = [
       '--dump-json',
       '--skip-download',
-      '--js-runtimes', 'node',
-      '--remote-components', 'ejs:github',
       '--sponsorblock-remove', 'sponsor',
       testVideoUrl
     ];
@@ -56,8 +52,6 @@ describe('SponsorBlock Integration Tests', () => {
     const args = [
       '--dump-json',
       '--skip-download',
-      '--js-runtimes', 'node',
-      '--remote-components', 'ejs:github',
       '--sponsorblock-mark', 'sponsor,intro,outro,selfpromo',
       testVideoUrl
     ];
