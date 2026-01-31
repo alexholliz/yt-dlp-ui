@@ -1,8 +1,8 @@
 # yt-dlp-ui Project State & History
 
 **Last Updated:** 2026-01-31  
-**Version:** 1.1.0-beta  
-**Status:** Fully Functional with Enhanced Features
+**Version:** 1.2.0  
+**Status:** Production-Ready with Comprehensive Documentation
 
 > **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
 > This document MUST be kept up-to-date as development continues.  
@@ -629,6 +629,22 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-01-31):**
+- **IMPLEMENTED: Comprehensive Testing Documentation** (NEW)
+  - Created TESTING_CHECKLIST.md with yt-dlp research findings
+  - Documented two-tier testing approach (unit + integration)
+  - Added checklist for future test additions
+  - Explained CI/CD testing strategy and best practices
+  - Included yt-dlp testing strategy analysis
+- **IMPLEMENTED: Documentation Wiki Migration** (IMPROVEMENT)
+  - Updated README.md to link to GitHub Wiki pages
+  - Created wiki structure for all documentation
+  - Organized docs: Quickstart, Development, CI/CD, Testing, Features
+  - Centralized documentation for better discoverability
+- **IMPLEMENTED: UI Footer Links** (IMPROVEMENT)
+  - Added GitHub repository link (bottom left sidebar)
+  - Added Documentation wiki link (bottom left sidebar)
+  - SVG icons for GitHub (octocat) and Docs (book)
+  - Hover effects and visual polish
 - **IMPLEMENTED: CI/CD Pipeline with GitHub Actions** (NEW FEATURE)
   - Created `.github/workflows/build-and-test.yml` workflow
   - Automated testing and multi-arch Docker builds (amd64, arm64)

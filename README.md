@@ -76,7 +76,7 @@ npm run dev
 4. **Monitor**: Check the "Downloads" tab for queue status and progress
 5. **Schedule**: Open Settings to enable automatic periodic downloads
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed walkthrough.
+See the [Quick Start Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Quickstart) for a detailed walkthrough.
 
 ## Key Features
 
@@ -123,11 +123,13 @@ Configure automatic downloads to check for new content periodically:
 
 ## Documentation
 
-- [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- [Development Guide](DEVELOPMENT.md) - Architecture and API docs
-- [CI/CD Guide](CI_CD_GUIDE.md) - Pipeline setup and deployment
-- [Features Complete](FEATURES_COMPLETE.md) - Full feature list
-- [MVP Complete](MVP_COMPLETE.md) - Initial release notes
+- [📖 Documentation Wiki](https://github.com/alexholliz/yt-dlp-ui/wiki) - Complete documentation
+- [🚀 Quick Start Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Quickstart) - Get started in 5 minutes
+- [🛠️ Development Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Development) - Architecture and API docs
+- [🔄 CI/CD Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/CI-CD-Guide) - Pipeline setup and deployment
+- [✨ Features Complete](https://github.com/alexholliz/yt-dlp-ui/wiki/Features-Complete) - Full feature list
+- [🧪 Testing Strategy](TESTING_CHECKLIST.md) - Test architecture and best practices
+- [📊 Project State](PROJECT_STATE.md) - Current status, history, and roadmap
 
 ## Contributing
 
@@ -144,7 +146,7 @@ Contributions are welcome! Please:
 - Code review approval from maintainers
 - Up-to-date with `main` branch
 
-See [CI_CD_GUIDE.md](CI_CD_GUIDE.md) for pipeline details.
+See the [CI/CD Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/CI-CD-Guide) for pipeline details.
 
 ## Technology Stack
 
