@@ -1,6 +1,6 @@
 # yt-dlp-ui Project State & History
 
-**Last Updated:** 2026-01-30  
+**Last Updated:** 2026-01-31  
 **Version:** 1.0.0-beta  
 **Status:** Fully Functional
 
@@ -162,17 +162,16 @@ downloaded_at, file_path, created_at, updated_at
    - **Workaround**: Fallback extracts from URL (@username)
    - Falls back to "Unknown (X playlists found)" with functioning links
 
-2. **Library Size Calculation**: Currently hardcoded to 0, not calculated from filesystem
-   - **Future**: Add filesystem scanning or track during download
-
-3. **sql.js Limitations**: Pure JavaScript SQLite implementation
+2. **sql.js Limitations**: Pure JavaScript SQLite implementation
    - Entire database loaded into memory
    - Must call save() to persist changes
    - Not recommended for databases >100MB
 
-4. **Progress Parsing**: yt-dlp progress output varies, parsing is approximate
+3. **Progress Parsing**: yt-dlp progress output varies, parsing is approximate
 
-5. **Single Download Queue**: Sequential processing (one video at a time per worker)
+4. **Single Download Queue**: Sequential processing (one video at a time per worker)
+
+**All other known bugs have been fixed as of 2026-01-30!**
 
 ### 📈 Performance Characteristics
 
@@ -314,6 +313,14 @@ User wanted to create a yt-dlp web UI inspired by Pinchflat but with better play
 - Enumeration progress indicators
 - Auto-refresh after adding channels
 - Video count display in playlists
+
+**Phase 5: Bug Fixes & Polish (Commit 14)**
+- Library size calculation from database
+- Queue display with video titles and channel names
+- Error handling for failed downloads with detailed messages
+- Modal backdrop click fixes
+- Database migrations for file_size and error_message columns
+- Enhanced API endpoints with richer video data
 
 ### Key Technical Decisions & Rationale
 
@@ -498,11 +505,11 @@ open http://localhost:8189
 ### Recent Changes (Last 5 Commits)
 
 ```
+99e2cbd Fix known bugs: library size, queue display, error handling, and modal clicks
 e1ecd29 Add database migration for video_count column
 f60f08d Add comprehensive project state and continuation guide
 58206da Add video count display for playlists
 38bc885 Fix playlist enumeration and add channel name fallback
-36e8206 Add auto-refresh when adding channels
 ```
 
 > **Note**: When continuing development, update this section with latest commits using:  
@@ -569,10 +576,10 @@ f60f08d Add comprehensive project state and continuation guide
 ### Known Bugs to Fix
 
 1. ~~Channel name not always captured during enumeration~~ (Fixed with URL fallback)
-2. Library size shows 0 (not implemented)
-3. Queue table shows video IDs instead of titles (need to join with videos table)
-4. No error handling for failed downloads in UI
-5. Modal backdrop click sometimes doesn't close on first click
+2. ~~Library size shows 0~~ (Fixed - now calculated from database)
+3. ~~Queue table shows video IDs instead of titles~~ (Fixed - now shows titles and channel names)
+4. ~~No error handling for failed downloads in UI~~ (Fixed - shows error messages and status badges)
+5. ~~Modal backdrop click sometimes doesn't close on first click~~ (Fixed - re-added event listeners)
 6. ~~Video count not showing in playlists~~ (Fixed with migration and proper enumeration)
 
 ### Performance Optimizations Needed
