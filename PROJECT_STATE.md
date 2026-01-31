@@ -642,6 +642,20 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-01-31):**
+- **IMPLEMENTED: Wiki Link Cleanup** (MAINTENANCE)
+  - Cloned wiki repository to ~/git/hub/yt-dlp-ui.wiki/
+  - Fixed internal wiki links (removed .md extensions, use page names)
+  - Updated Home page with organized navigation structure
+  - Added references to main repo files (PROJECT_STATE.md, TESTING_CHECKLIST.md, CI_CD_CHECKLIST.md)
+  - Fixed CI-CD-Pipeline-Setup.md and Development.md cross-references
+  - All wiki pages now use correct linking conventions
+- **IMPLEMENTED: Documentation File Responsibilities** (IMPROVEMENT)
+  - Updated PROJECT_STATE.md with clear file maintenance matrix
+  - Added session startup checklist (read 4 key files)
+  - Defined when to update each documentation file
+  - Added header notes to CI_CD_CHECKLIST.md and TESTING_CHECKLIST.md
+  - Created WIKI_LINK_CLEANUP.md with automated cleanup commands
+  - Established documentation maintenance workflow
 - **IMPLEMENTED: Comprehensive Testing Documentation** (NEW)
   - Created TESTING_CHECKLIST.md with yt-dlp research findings
   - Documented two-tier testing approach (unit + integration)
@@ -651,8 +665,9 @@ open http://localhost:8189
 - **IMPLEMENTED: Documentation Wiki Migration** (IMPROVEMENT)
   - Updated README.md to link to GitHub Wiki pages
   - Created wiki structure for all documentation
-  - Organized docs: Quickstart, Development, CI/CD, Testing, Features
+  - Organized docs: Quickstart, Development, CI/CD, Security, Features
   - Centralized documentation for better discoverability
+  - Keep PROJECT_STATE.md, TESTING_CHECKLIST.md, CI_CD_CHECKLIST.md in main repo
 - **IMPLEMENTED: UI Footer Links** (IMPROVEMENT)
   - Added GitHub repository link (bottom left sidebar)
   - Added Documentation wiki link (bottom left sidebar)
