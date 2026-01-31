@@ -697,16 +697,33 @@ open http://localhost:8189
   - Integrated with download-manager to inject `--sponsorblock-mark` or `--sponsorblock-remove` flags
   - UI toggles to show/hide SponsorBlock settings
   - Categories selectable via checkboxes
-- **IMPLEMENTED: Comprehensive Test Suite** (NEW FEATURE)
+- **IMPLEMENTED: Comprehensive Test Suite** (MAJOR UPDATE)
   - Using Node.js built-in test runner (`node --test`)
-  - **Unit tests** (12 tests):
-    - Database operations (test/database.test.js)
-    - SponsorBlock flag generation (test/sponsorblock.test.js)
-  - **Integration tests** (3 tests):
-    - Real yt-dlp execution with SponsorBlock (test/sponsorblock-integration.test.js)
-    - Uses test video: https://www.youtube.com/watch?v=aLXiLRuCqvE
-    - Verifies SponsorBlock marks/removes sponsor segments
-    - **Skipped in CI** due to YouTube bot detection (runs locally with cookies)
+  - **Unit tests** (35 tests - all run in CI):
+    - Database operations (test/database.test.js) - 6 tests
+    - SponsorBlock flag generation (test/sponsorblock.test.js) - 6 tests
+    - **API endpoint coverage** (test/api-endpoints.test.js) - 23 tests
+      - All profile endpoints (GET, POST, PUT, DELETE)
+      - All channel endpoints (GET, POST, PUT, DELETE)
+      - All playlist endpoints (GET, PUT, DELETE videos)
+      - All video endpoints (GET, DELETE single/bulk)
+      - All stats endpoints (global, per-channel, recent downloads)
+      - All download control endpoints (start, retry, status, queue)
+      - Request validation and error responses (400, 404, 500)
+  - **Integration tests** (~33 tests - skip in CI, run locally):
+    - Real yt-dlp execution with SponsorBlock (test/sponsorblock-integration.test.js) - 3 tests
+    - **HTTP Basic Auth security** (test/http-auth.test.js) - ~30 tests
+      - Tests all endpoints return 401 without authentication
+      - Tests all endpoints return success with valid credentials
+      - Verifies no content leakage in 401 responses
+      - Tests static file protection (HTML, CSS, JS)
+      - Starts Docker container with auth env vars for testing
+  - **Test Scripts**:
+    - `npm test` - Unit tests only (CI-friendly, 35 tests)
+    - `npm run test:integration` - SponsorBlock integration tests
+    - `npm run test:auth` - HTTP auth security tests (requires Docker)
+    - `npm run test:all` - All tests including integration (68+ tests)
+  - **Testing Philosophy**: Following yt-dlp's proven 95% unit tests, 5% integration tests approach
   - All unit tests passing in CI
   - Integration tests run locally for manual verification
 - **Git Configuration Updated**:

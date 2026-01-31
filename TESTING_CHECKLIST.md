@@ -47,17 +47,25 @@ This project follows **yt-dlp's battle-tested two-tier testing approach**: compr
 - SponsorBlock flag generation
 - Configuration parsing
 - Edge cases and error handling
+- **API endpoint logic** (35 tests covering all endpoints)
+- **Request validation and error responses**
+
+**Test Files**:
+- `test/database.test.js` - Database CRUD operations
+- `test/sponsorblock.test.js` - SponsorBlock flag generation logic
+- `test/api-endpoints.test.js` - **NEW:** All API endpoints (GET/POST/PUT/DELETE)
 
 ### 🔄 Integration Tests (Optional, Local Execution)
 
-**Location**: `test/sponsorblock-integration.test.js`
+**Location**: `test/sponsorblock-integration.test.js`, `test/http-auth.test.js`
 
-**Purpose**: Verify actual yt-dlp execution with SponsorBlock
+**Purpose**: Verify actual system behavior with real dependencies
 
 **Characteristics**:
 - Calls real yt-dlp with YouTube videos
 - Requires authentication (cookies) to avoid bot detection
-- Slower (~4 seconds per test)
+- Requires Docker for auth tests
+- Slower (~4-30 seconds per test)
 - Skipped in CI automatically (`skip: isCI`)
 - Run locally by developers when needed
 
@@ -66,6 +74,8 @@ This project follows **yt-dlp's battle-tested two-tier testing approach**: compr
 - SponsorBlock mark/remove modes
 - Actual video metadata parsing
 - End-to-end workflow validation
+- **HTTP Basic Auth security** (all endpoints protected)
+- **Content leakage prevention** (no data exposed without auth)
 
 ---
 
@@ -106,24 +116,50 @@ COPY public/ ./public/
 
 ## Running Tests Locally
 
-### All Tests (Including Integration)
+### Quick Test Commands
+
 ```bash
-# With Docker (recommended)
+# Unit tests only (fast, always pass in CI)
+npm test
+
+# Integration tests only (requires yt-dlp + cookies)
+npm run test:integration
+
+# HTTP Basic Auth tests (requires Docker)
+npm run test:auth
+
+# All tests (including integration)
+npm run test:all
+```
+
+### With Docker (Recommended)
+
+```bash
+# Build and run test stage
 docker build --target test -t yt-dlp-ui:test .
 docker run --rm yt-dlp-ui:test
 
-# Without Docker (requires yt-dlp, ffmpeg, node)
+# Run specific test file
+docker run --rm -v ${PWD}:/app -w /app node:20-alpine npm test test/api-endpoints.test.js
+```
+
+### Specific Test Suites
+
+```bash
+# Database + SponsorBlock + API endpoints (unit tests)
 npm test
-```
 
-### Unit Tests Only
-```bash
-npm test test/database.test.js test/sponsorblock.test.js
-```
+# Just API endpoint tests
+node --test test/api-endpoints.test.js
 
-### Integration Tests Only
-```bash
-npm test test/sponsorblock-integration.test.js
+# Just database tests
+node --test test/database.test.js
+
+# SponsorBlock integration (requires YouTube access)
+node --test test/sponsorblock-integration.test.js
+
+# HTTP auth security tests (requires Docker)
+node --test test/http-auth.test.js
 ```
 
 **Note**: Integration tests require YouTube cookies for authentication. Export cookies from your browser using an extension like "Get cookies.txt LOCALLY".
@@ -217,9 +253,11 @@ describe('Feature Integration Tests', () => {
 |------|------|-------|----------|
 | `test/database.test.js` | Unit | 6 tests | Database operations, migrations |
 | `test/sponsorblock.test.js` | Unit | 6 tests | Flag generation, validation |
+| `test/api-endpoints.test.js` | Unit | 23 tests | All API endpoints (profiles, channels, stats, downloads) |
 | `test/sponsorblock-integration.test.js` | Integration | 3 tests | Real yt-dlp execution |
+| `test/http-auth.test.js` | Integration | ~30 tests | HTTP Basic Auth security (skipped in CI) |
 
-**Total**: 15 tests (12 unit, 3 integration)
+**Total**: 68+ tests (35 unit, 33+ integration)
 
 ### Test Naming Convention
 
@@ -230,14 +268,121 @@ describe('Feature Integration Tests', () => {
 
 ```
 test/
-├── database.test.js              # Database unit tests
-├── sponsorblock.test.js          # SponsorBlock logic unit tests
-└── sponsorblock-integration.test.js  # SponsorBlock integration tests
+├── database.test.js                     # Database unit tests
+├── sponsorblock.test.js                 # SponsorBlock logic unit tests
+├── api-endpoints.test.js                # API endpoint unit tests (NEW)
+├── sponsorblock-integration.test.js     # SponsorBlock integration tests
+└── http-auth.test.js                    # HTTP Basic Auth security tests (NEW)
 ```
 
 ---
 
-## Debugging Failed Tests
+## Testing Patterns & Best Practices
+
+### API Endpoint Testing Pattern
+
+**File**: `test/api-endpoints.test.js`
+
+**Approach**: Create minimal Express app with routes, mock external services
+
+**Why This Works**:
+- Tests endpoint logic in isolation
+- No need to start full server
+- Fast and reliable
+- Can test error conditions easily
+
+**Pattern**:
+```javascript
+const request = require('supertest');
+const express = require('express');
+
+// Create test app
+const app = express();
+app.use(express.json());
+
+// Mock services
+const mockDb = { /* methods */ };
+const mockYtDlp = { /* methods */ };
+
+// Define routes (matching server.js)
+app.get('/api/channels', (req, res) => {
+  const channels = mockDb.getAllChannels();
+  res.json(channels);
+});
+
+// Test
+describe('GET /api/channels', () => {
+  it('should return all channels', async () => {
+    const res = await request(app).get('/api/channels');
+    assert.strictEqual(res.status, 200);
+    assert.ok(Array.isArray(res.body));
+  });
+});
+```
+
+**Coverage** (35 tests):
+- ✅ All profile endpoints (GET, POST, PUT, DELETE)
+- ✅ All channel endpoints (GET, POST, PUT, DELETE)
+- ✅ All playlist endpoints (GET, PUT, DELETE videos)
+- ✅ All video endpoints (GET, DELETE single/bulk)
+- ✅ All stats endpoints (global, per-channel, recent downloads)
+- ✅ All download control endpoints (start, retry, status, queue)
+- ✅ Error cases (404, 400, 500)
+- ✅ Request validation
+
+### HTTP Basic Auth Testing Pattern
+
+**File**: `test/http-auth.test.js`
+
+**Approach**: Start Docker container with auth env vars, test all endpoints
+
+**Why This Works**:
+- Tests real authentication middleware
+- Verifies no content leakage
+- Tests all endpoints systematically
+- Confirms 401 responses include WWW-Authenticate header
+
+**Pattern**:
+```javascript
+const isCI = process.env.CI === 'true';
+
+describe('HTTP Basic Auth', { skip: isCI }, () => {
+  before(async () => {
+    // Start container with BASIC_AUTH_USERNAME and PASSWORD
+    execSync('docker run -d -p 18190:8189 -e BASIC_AUTH_USERNAME=test -e BASIC_AUTH_PASSWORD=pass ...');
+    await waitForServer('http://localhost:18190', 30000);
+  });
+  
+  after(() => {
+    // Clean up container
+    execSync('docker stop ...');
+  });
+  
+  it('should return 401 without credentials', async () => {
+    const res = await fetch('http://localhost:18190/api/channels');
+    assert.strictEqual(res.status, 401);
+    assert.ok(res.headers.get('www-authenticate').includes('Basic'));
+  });
+  
+  it('should allow access with valid credentials', async () => {
+    const auth = Buffer.from('test:pass').toString('base64');
+    const res = await fetch('http://localhost:18190/api/channels', {
+      headers: { 'Authorization': `Basic ${auth}` }
+    });
+    assert.strictEqual(res.status, 200);
+  });
+});
+```
+
+**Coverage** (~30 tests):
+- ✅ All endpoints return 401 without auth
+- ✅ All endpoints return success with valid auth
+- ✅ Invalid credentials rejected
+- ✅ No content leakage in 401 responses
+- ✅ Static files protected (HTML, CSS, JS)
+- ✅ WWW-Authenticate header present
+
+### Integration Test Pattern (yt-dlp)
 
 ### Unit Test Failures
 1. Run test locally: `npm test test/[failing-test].test.js`
