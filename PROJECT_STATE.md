@@ -26,6 +26,10 @@
 > - Add session summary to "Latest Session Changes"
 > - Update version number if appropriate (major/minor/patch)
 > - Commit all documentation updates with code changes
+> - **If UI/backend code changed: Rebuild and restart Docker container**
+>   ```bash
+>   docker-compose down && docker-compose build && docker-compose up -d
+>   ```
 > 
 > **Git Configuration for this Repository:**
 > - Git user name: `alexholliz`
