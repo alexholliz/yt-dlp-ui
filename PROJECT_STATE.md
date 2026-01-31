@@ -1,8 +1,8 @@
 # yt-dlp-ui Project State & History
 
 **Last Updated:** 2026-01-31  
-**Version:** 1.2.0  
-**Status:** Production-Ready with Comprehensive Documentation
+**Version:** 1.3.0  
+**Status:** Production-Ready with Comprehensive Test Coverage
 
 > **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
 > 
@@ -352,6 +352,59 @@ This is a functional YouTube download manager built with Node.js, Express, and S
 ---
 
 ## Development History & Context
+
+### Version 1.3.0 - Comprehensive API Test Coverage (2026-01-31)
+
+**Added comprehensive testing infrastructure:**
+
+**New Test Files:**
+- `test/api-endpoints.test.js` (23 tests) - All API endpoint coverage
+  - Profile endpoints (GET, POST, PUT, DELETE)
+  - Channel endpoints (GET, POST, PUT, DELETE)  
+  - Playlist endpoints (GET, PUT, DELETE videos)
+  - Video endpoints (GET, DELETE single/bulk)
+  - Stats endpoints (global, per-channel, recent)
+  - Download control endpoints (start, retry, status, queue)
+  - Request validation and error responses (400, 404, 500)
+  - Uses supertest for isolated testing with mocked services
+
+- `test/http-auth.test.js` (~30 tests) - Security validation
+  - All endpoints protected (return 401 without auth)
+  - All endpoints accessible with valid credentials
+  - No content leakage in 401 responses
+  - Static file protection (HTML, CSS, JS)
+  - Requires Docker container with auth env vars
+  - Skipped in CI (too slow), runs locally for security validation
+
+**Test Scripts Added:**
+- `npm test` - Unit tests only (35 tests, CI-friendly)
+- `npm run test:integration` - SponsorBlock integration tests
+- `npm run test:auth` - HTTP Basic Auth security tests (Docker required)
+- `npm run test:all` - All tests including integration (68+ total)
+
+**Documentation Updates:**
+- Updated TESTING_CHECKLIST.md with API testing patterns
+- Updated TESTING_CHECKLIST.md with HTTP auth testing patterns
+- Updated PROJECT_STATE.md with test coverage details
+- Documented technical decisions and alternatives considered
+
+**Test Results:**
+- ✅ All 35 unit tests passing in CI (32 seconds)
+- ✅ Integration tests skip automatically in CI
+- ✅ Follows yt-dlp's 95% unit / 5% integration approach
+- ✅ Test job completed successfully on GitHub Actions
+
+**Technical Decisions:**
+1. **supertest for API testing**: Clean integration with Express
+2. **Deferred UI JavaScript tests**: API tests provide sufficient coverage
+3. **Docker-based auth tests**: Only way to verify real auth middleware
+4. **Separate unit/integration tests**: Follows proven yt-dlp pattern
+
+**Dependencies Added:**
+- `supertest` - HTTP assertion library for Express
+- `jsdom` - Installed but not used yet (reserved for future UI tests)
+
+### Version 1.2.0 - Production-Ready Documentation (2026-01-31)
 
 ### Project Genesis
 
