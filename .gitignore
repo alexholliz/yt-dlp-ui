@@ -9,3 +9,6 @@ config/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+
+# Accidentally created files
+dy
