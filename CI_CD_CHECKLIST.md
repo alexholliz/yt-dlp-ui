@@ -21,7 +21,7 @@ After you push the pipeline to GitHub, complete these steps:
   1. Go to: https://github.com/<username>/yt-dlp-ui
   2. Click **Packages** (right sidebar)
   3. Click `yt-dlp-ui` package
-  4. Click **Package settings** (bottom left)
+  4. Click **Package settings** (bottom right)
   5. Scroll to **Danger Zone**
   6. Click **Change visibility** → **Public**
   7. Confirm the change

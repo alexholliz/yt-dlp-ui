@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>yt-dlp-ui</Name>
-  <Repository>yt-dlp-ui:latest</Repository>
+  <Repository>ghcr.io/alexholliz/yt-dlp-ui:latest</Repository>
   <Registry>https://ghcr.io/</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/yourusername/yt-dlp-ui</Support>
-  <Project>https://github.com/yourusername/yt-dlp-ui</Project>
+  <Support>https://github.com/alexholliz/yt-dlp-ui</Support>
+  <Project>https://github.com/alexholliz/yt-dlp-ui</Project>
   <Overview>A self-hosted web UI for managing yt-dlp downloads with intelligent playlist handling. Automatically enumerate and organize playlists from YouTube channels with per-playlist download control.</Overview>
   <Category>Downloaders: MediaApp:Video</Category>
   <WebUI>http://[IP]:[PORT:8189]</WebUI>
   <TemplateURL/>
-  <Icon>https://raw.githubusercontent.com/yourusername/yt-dlp-ui/main/icon.png</Icon>
+  <Icon>https://raw.githubusercontent.com/alexholliz/yt-dlp-ui/main/icon.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>

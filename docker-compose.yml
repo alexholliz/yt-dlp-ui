@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   yt-dlp-ui:
-    build: .
+    image: ghcr.io/alexholliz/yt-dlp-ui:latest
     container_name: yt-dlp-ui
     ports:
       - "8189:8189"
