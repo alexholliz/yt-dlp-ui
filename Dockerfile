@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-alpine AS base
 
 # Install yt-dlp and ffmpeg
 RUN apk add --no-cache \
@@ -12,13 +12,35 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# ============================================
+# Test stage - includes all test dependencies
+# ============================================
+FROM base AS test
+
+# Install all dependencies (including dev dependencies)
+RUN npm ci
+
+# Copy test files
+COPY test/ ./test/
+
+# Copy application files for testing
+COPY src/ ./src/
+COPY public/ ./public/
+
+# Run tests
+CMD ["npm", "test"]
+
+# ============================================
+# Production stage - lean image without tests
+# ============================================
+FROM base AS production
+
+# Install only production dependencies
 RUN npm ci --only=production
 
 # Copy application files
 COPY src/ ./src/
 COPY public/ ./public/
-COPY test/ ./test/
 
 # Create necessary directories
 RUN mkdir -p /config /downloads
