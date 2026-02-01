@@ -597,6 +597,14 @@ async function viewChannel(channelId) {
             <small>Advanced yt-dlp options only. Metadata/thumbnails/subtitles are controlled by toggles above.</small>
           </div>
           
+          <!-- Detected Overrides/Duplicates -->
+          <div id="conflicts-box-${channelId}" style="display: none; margin: 1rem 0; padding: 0.75rem; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning, #ffc107); border-radius: 4px;">
+            <strong style="display: block; margin-bottom: 0.5rem; color: var(--warning-dark, #856404);">⚠️ Detected Overridden or Duplicate Options:</strong>
+            <div id="conflicts-content-${channelId}" style="font-size: 0.85rem; line-height: 1.6; color: var(--text);">
+              Loading...
+            </div>
+          </div>
+          
           <!-- Computed Options Display -->
           <div class="content-box" style="margin: 1rem 0; background: var(--surface-hover);">
             <h4 style="margin-bottom: 0.5rem;">Final yt-dlp Options for This Channel</h4>
@@ -1078,8 +1086,10 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 8. Filter and add custom options
+      // 8. Detect conflicts/duplicates and filter custom options
       const customFiltered = [];
+      const conflicts = [];
+      
       if (customOptions) {
         const customArgsParsed = customOptions.split(/\s+/);
         
@@ -1089,21 +1099,95 @@ function updateComputedOptions(channelId, channel) {
           
           // Check if this flag should be filtered
           if (flagsToFilter.includes(argWithoutValue)) {
-            // Skip this flag
-            // Also skip the value if this flag takes a value
+            // Determine what's overriding this custom option
+            let overrideSource = '';
+            let overrideIcon = '';
+            let overrideFlag = argWithoutValue;
+            
+            // Check toggles first (highest priority)
+            if (downloadMetadata && argWithoutValue === '--write-info-json') {
+              overrideSource = 'Metadata Toggle (download)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--write-info-json';
+            } else if (embedMetadata && argWithoutValue === '--embed-metadata') {
+              overrideSource = 'Metadata Toggle (embed)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--embed-metadata';
+            } else if (downloadThumbnail && argWithoutValue === '--write-thumbnail') {
+              overrideSource = 'Thumbnail Toggle (download)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--write-thumbnail';
+            } else if (embedThumbnail && argWithoutValue === '--embed-thumbnail') {
+              overrideSource = 'Thumbnail Toggle (embed)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--embed-thumbnail';
+            } else if ((downloadSubtitles || embedSubtitles) && (argWithoutValue === '--sub-lang' || argWithoutValue === '--sub-langs')) {
+              overrideSource = 'Subtitle Toggle (language)';
+              overrideIcon = '🎚️';
+              overrideFlag = `--sub-langs ${subtitleLanguages || 'en'}`;
+            } else if (downloadSubtitles && (argWithoutValue === '--write-subs' || argWithoutValue === '--write-subtitles')) {
+              overrideSource = 'Subtitle Toggle (download)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--write-subs';
+            } else if (embedSubtitles && (argWithoutValue === '--embed-subs' || argWithoutValue === '--embed-subtitles')) {
+              overrideSource = 'Subtitle Toggle (embed)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--embed-subs';
+            } else if (autoSubtitles && (argWithoutValue === '--write-auto-subs' || argWithoutValue === '--write-automatic-subs')) {
+              overrideSource = 'Subtitle Toggle (auto)';
+              overrideIcon = '🎚️';
+              overrideFlag = '--write-auto-subs';
+            } 
+            // Check profile (second priority)
+            else if (profile) {
+              if (profile.format_selection && (argWithoutValue === '-f' || argWithoutValue === '--format')) {
+                overrideSource = 'yt-dlp Profile (format)';
+                overrideIcon = '🎯';
+                overrideFlag = `-f "${profile.format_selection}"`;
+              } else if (profile.merge_output_format && argWithoutValue === '--merge-output-format') {
+                overrideSource = 'yt-dlp Profile (merge)';
+                overrideIcon = '🎯';
+                overrideFlag = `--merge-output-format ${profile.merge_output_format}`;
+              } else if (profile.additional_args) {
+                // Check if this flag is in profile additional args
+                const profileArgs = profile.additional_args.split(/\s+/);
+                if (profileArgs.some(pArg => pArg.split('=')[0] === argWithoutValue)) {
+                  overrideSource = 'yt-dlp Profile (additional)';
+                  overrideIcon = '🎯';
+                  overrideFlag = profileArgs.find(pArg => pArg.split('=')[0] === argWithoutValue) || argWithoutValue;
+                }
+              }
+            }
+            
+            // Collect the full custom argument (flag + value if present)
+            let fullCustomArg = arg;
+            let valueTokens = [];
+            
+            // Skip this flag and collect value if present
             if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
               const nextToken = customArgsParsed[i + 1];
-              // Skip next token if it's not a flag (it's the value)
               if (!nextToken.startsWith('-')) {
                 i++; // Skip the value token
+                valueTokens.push(nextToken);
                 
                 // If value starts with quote, consume until closing quote
                 if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
                   while (i + 1 < customArgsParsed.length && !customArgsParsed[i].endsWith('"')) {
                     i++;
+                    valueTokens.push(customArgsParsed[i]);
                   }
                 }
+                fullCustomArg = `${arg} ${valueTokens.join(' ')}`;
               }
+            }
+            
+            if (overrideSource) {
+              conflicts.push({
+                customFlag: fullCustomArg,
+                overrideIcon,
+                overrideSource,
+                overrideFlag
+              });
             }
           } else {
             customFiltered.push(arg);
@@ -1135,7 +1219,8 @@ function updateComputedOptions(channelId, channel) {
       
       return {
         combined: allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)',
-        breakdown: breakdown
+        breakdown: breakdown,
+        conflicts: conflicts
       };
     };
     
@@ -1150,6 +1235,18 @@ function updateComputedOptions(channelId, channel) {
           `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
         ).join('');
         document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
+        
+        // Display conflicts if any
+        if (result.conflicts.length > 0) {
+          const conflictsHtml = result.conflicts.map(conflict => 
+            `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
+            `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+          ).join('');
+          document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
+          document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
+        } else {
+          document.getElementById(`conflicts-box-${channelId}`).style.display = 'none';
+        }
       }).catch(() => {
         const result = computeFinal();
         document.getElementById(`computed-options-${channelId}`).textContent = result.combined;
@@ -1158,6 +1255,18 @@ function updateComputedOptions(channelId, channel) {
           `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
         ).join('');
         document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
+        
+        // Display conflicts if any
+        if (result.conflicts.length > 0) {
+          const conflictsHtml = result.conflicts.map(conflict => 
+            `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
+            `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+          ).join('');
+          document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
+          document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
+        } else {
+          document.getElementById(`conflicts-box-${channelId}`).style.display = 'none';
+        }
       });
     } else {
       const result = computeFinal();
@@ -1167,6 +1276,18 @@ function updateComputedOptions(channelId, channel) {
         `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
       ).join('');
       document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
+      
+      // Display conflicts if any
+      if (result.conflicts.length > 0) {
+        const conflictsHtml = result.conflicts.map(conflict => 
+          `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+        ).join('');
+        document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
+        document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
+      } else {
+        document.getElementById(`conflicts-box-${channelId}`).style.display = 'none';
+      }
     }
   } catch (err) {
     console.error('Failed to update computed options:', err);
