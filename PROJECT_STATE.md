@@ -938,6 +938,10 @@ open http://localhost:8189
    - **Subtitles**:
      - Toggle: "Download Subtitles" → writes .srt/.vtt files alongside video
      - Toggle: "Embed Subtitles" → embeds subtitles in video container
+     - Toggle: "Include Auto-Generated Subtitles" → downloads auto-generated subs if manual ones unavailable
+       - Default: OFF
+       - Behavior: Prefers manual subtitles, falls back to auto-generated
+       - Maps to yt-dlp flag: `--write-auto-subs` (combined with `--write-subs`)
      - Text input: "Subtitle Languages" → comma-delimited language codes
        - Default value: `en`
        - Example text: `e.g., en,de,es for English, German, Spanish`
