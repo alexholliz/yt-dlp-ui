@@ -691,9 +691,12 @@ async function togglePlaylist(playlistId, enabled) {
 
 async function toggleChannel(channelId, enabled) {
   try {
+    console.log(`Toggling channel ${channelId} to ${enabled}`);
     await api.put(`/api/channels/${channelId}`, { enabled });
+    console.log(`Successfully toggled channel ${channelId}`);
     showNotification(`Channel ${enabled ? 'enabled' : 'disabled'} for automation`, 'success');
   } catch (err) {
+    console.error(`Failed to toggle channel ${channelId}:`, err);
     showNotification(`Failed to toggle channel: ${err.message}`, 'error');
     // Revert the toggle on error
     const checkbox = document.querySelector(`input[onchange*="toggleChannel(${channelId}"]`);
