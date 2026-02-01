@@ -938,6 +938,10 @@ open http://localhost:8189
    - **Subtitles**:
      - Toggle: "Download Subtitles" → writes .srt/.vtt files alongside video
      - Toggle: "Embed Subtitles" → embeds subtitles in video container
+     - Text input: "Subtitle Languages" → comma-delimited language codes
+       - Default value: `en`
+       - Example text: `e.g., en,de,es for English, German, Spanish`
+       - Maps to yt-dlp flag: `--sub-langs en,de,es`
    - **Thumbnails**:
      - Toggle: "Download Thumbnails" → writes .jpg/.png files alongside video
      - Toggle: "Embed Thumbnails" → embeds thumbnail in video container
