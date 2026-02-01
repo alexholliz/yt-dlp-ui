@@ -291,7 +291,7 @@ async function loadChannelsPage() {
           <td>
             <label class="toggle-switch">
               <input type="checkbox" checked onchange="toggleChannel(${c.id}, this.checked)">
-              <span class="slider"></span>
+              <span class="toggle-slider"></span>
             </label>
           </td>
         </tr>
@@ -395,7 +395,7 @@ async function viewChannel(channelId) {
               <div class="playlist-actions">
                 <label class="toggle-switch">
                   <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="togglePlaylist(${p.id}, this.checked)">
-                  <span class="slider"></span>
+                  <span class="toggle-slider"></span>
                 </label>
                 <button class="btn btn-secondary btn-small" onclick="refreshPlaylist(${p.id}, ${channelId})" title="Refresh video count">↻</button>
                 <button class="btn btn-primary btn-small" onclick="downloadPlaylist(${p.id})">Download</button>
