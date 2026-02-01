@@ -900,8 +900,6 @@ async function saveChannelSettings(channelId, e) {
   }
 }
 
-}
-
 // Delete Channel Modal
 let channelToDelete = null;
 
