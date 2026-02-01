@@ -267,6 +267,12 @@ additional_args, created_at, updated_at
    - **TODO**: Update DELETE /api/videos/:id endpoint to also remove from history
    - **Impact**: Low priority - doesn't affect functionality, just UI clarity
 
+6. **Failed Download Error Messages**: Shows generic "yt-dlp exited with code 1" instead of actual error
+   - **Current**: Database stores error_message but UI shows exit code
+   - **TODO**: Display actual error message in media history and video modal
+   - **Example**: Cookie-related errors should show "Sign in to confirm you're not a bot" not just "code 1"
+   - **Impact**: Medium priority - makes troubleshooting difficult
+
 **All critical bugs fixed as of 2026-01-31!**
 
 ### 📈 Performance Characteristics
