@@ -432,20 +432,133 @@ async function viewChannel(channelId) {
             <small>Select a profile or leave as None to use custom options</small>
           </div>
           <div class="form-group">
-            <label><input type="checkbox" id="edit-playlist-mode-${channelId}" ${channel.playlist_mode === 'enumerate' ? 'checked' : ''}> Enumerate Playlists</label>
+            <label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="edit-playlist-mode-${channelId}" ${channel.playlist_mode === 'enumerate' ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </div>
+              Enumerate Playlists
+            </label>
           </div>
           <div class="form-group">
-            <label><input type="checkbox" id="edit-auto-add-${channelId}" ${channel.auto_add_new_playlists ? 'checked' : ''}> Auto-enable new playlists</label>
+            <label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="edit-auto-add-${channelId}" ${channel.auto_add_new_playlists ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </div>
+              Auto-enable new playlists
+            </label>
           </div>
           <div class="form-group">
-            <label><input type="checkbox" id="edit-flat-mode-${channelId}" ${channel.flat_mode ? 'checked' : ''}> Flat mode (single folder)</label>
+            <label>
+              <div class="toggle-switch">
+                <input type="checkbox" id="edit-flat-mode-${channelId}" ${channel.flat_mode ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </div>
+              Flat mode (single folder)
+            </label>
+          </div>
+
+          <!-- Enhanced yt-dlp Options -->
+          <div class="content-box" style="margin: 1rem 0;">
+            <h3>Enhanced yt-dlp Options</h3>
+            
+            <!-- Metadata Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Metadata</label>
+              <div style="margin-left: 0.5rem;">
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-download-metadata-${channelId}" ${channel.download_metadata ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Download Metadata
+                </label>
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-embed-metadata-${channelId}" ${channel.embed_metadata ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Embed Metadata
+                </label>
+              </div>
+              <small style="display: block; margin-top: 0.25rem;">Download writes .info.json file. Embed adds metadata to video file.</small>
+            </div>
+
+            <!-- Thumbnail Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Thumbnails</label>
+              <div style="margin-left: 0.5rem;">
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-download-thumbnail-${channelId}" ${channel.download_thumbnail ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Download Thumbnail
+                </label>
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-embed-thumbnail-${channelId}" ${channel.embed_thumbnail ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Embed Thumbnail
+                </label>
+              </div>
+              <small style="display: block; margin-top: 0.25rem;">Download writes image file. Embed adds thumbnail to video file.</small>
+            </div>
+
+            <!-- Subtitle Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Subtitles</label>
+              <div style="margin-left: 0.5rem;">
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-download-subtitles-${channelId}" ${channel.download_subtitles ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Download Subtitles
+                </label>
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-embed-subtitles-${channelId}" ${channel.embed_subtitles ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Embed Subtitles
+                </label>
+              </div>
+              <small style="display: block; margin-top: 0.25rem;">Download writes .srt/.vtt files. Embed burns subtitles into video.</small>
+            </div>
+
+            <div id="edit-subtitle-settings-${channelId}" style="display: ${channel.download_subtitles || channel.embed_subtitles ? 'block' : 'none'}; margin-left: 1rem; padding-left: 1rem; border-left: 2px solid var(--border);">
+              <div class="form-group">
+                <label for="edit-subtitle-languages-${channelId}">Subtitle Languages</label>
+                <input type="text" id="edit-subtitle-languages-${channelId}" value="${escapeHtml(channel.subtitle_languages || 'en')}" placeholder="en">
+                <small>Comma-separated language codes (e.g., en,de,es,fr)</small>
+              </div>
+              <div class="form-group">
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="edit-auto-subtitles-${channelId}" ${channel.auto_subtitles ? 'checked' : ''}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Auto-generated Subtitles
+                </label>
+                <small style="display: block; margin-top: 0.25rem;">If enabled, downloads auto-generated subtitles when manual ones aren't available</small>
+              </div>
+            </div>
           </div>
 
           <!-- SponsorBlock Options -->
           <div class="content-box" style="margin: 1rem 0;">
             <h3>SponsorBlock Options</h3>
             <div class="form-group">
-              <label><input type="checkbox" id="edit-sponsorblock-enabled-${channelId}" ${channel.sponsorblock_enabled ? 'checked' : ''}> Enable SponsorBlock</label>
+              <label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="edit-sponsorblock-enabled-${channelId}" ${channel.sponsorblock_enabled ? 'checked' : ''}>
+                  <span class="toggle-slider"></span>
+                </div>
+                Enable SponsorBlock
+              </label>
               <small>Automatically handle sponsored segments and other video sections</small>
             </div>
             <div id="edit-sponsorblock-settings-${channelId}" style="display: ${channel.sponsorblock_enabled ? 'block' : 'none'};">
@@ -464,7 +577,13 @@ async function viewChannel(channelId) {
                     const categories = (channel.sponsorblock_categories || '').split(',');
                     const checked = categories.includes(cat) ? 'checked' : '';
                     const labels = { sponsor: 'Sponsor', intro: 'Intro', outro: 'Outro/Credits', selfpromo: 'Self-promotion', interaction: 'Interaction (Subscribe/Like)', preview: 'Preview/Recap', music_offtopic: 'Non-music (in music videos)' };
-                    return `<label><input type="checkbox" class="edit-sponsorblock-category-${channelId}" value="${cat}" ${checked}> ${labels[cat]}</label>`;
+                    return `<label>
+                      <div class="toggle-switch">
+                        <input type="checkbox" class="edit-sponsorblock-category-${channelId}" value="${cat}" ${checked}>
+                        <span class="toggle-slider"></span>
+                      </div>
+                      ${labels[cat]}
+                    </label>`;
                   }).join('')}
                 </div>
                 <small>Select which types of segments to mark or remove</small>
@@ -497,6 +616,16 @@ async function viewChannel(channelId) {
       const settings = document.getElementById(`edit-sponsorblock-settings-${channelId}`);
       settings.style.display = e.target.checked ? 'block' : 'none';
     });
+    
+    // Add subtitle settings toggle handler for edit form
+    const updateEditSubtitleSettings = () => {
+      const downloadSubs = document.getElementById(`edit-download-subtitles-${channelId}`).checked;
+      const embedSubs = document.getElementById(`edit-embed-subtitles-${channelId}`).checked;
+      document.getElementById(`edit-subtitle-settings-${channelId}`).style.display = (downloadSubs || embedSubs) ? 'block' : 'none';
+    };
+    
+    document.getElementById(`edit-download-subtitles-${channelId}`).addEventListener('change', updateEditSubtitleSettings);
+    document.getElementById(`edit-embed-subtitles-${channelId}`).addEventListener('change', updateEditSubtitleSettings);
   } catch (err) {
     showNotification('Failed to load channel: ' + err.message, 'error');
   }
@@ -682,6 +811,16 @@ async function saveChannelSettings(channelId, e) {
   const rescrapeDays = parseInt(document.getElementById(`edit-rescrape-days-${channelId}`).value);
   const profileId = document.getElementById(`edit-profile-${channelId}`)?.value || null;
   
+  // Enhanced yt-dlp options
+  const downloadMetadata = document.getElementById(`edit-download-metadata-${channelId}`).checked;
+  const embedMetadata = document.getElementById(`edit-embed-metadata-${channelId}`).checked;
+  const downloadThumbnail = document.getElementById(`edit-download-thumbnail-${channelId}`).checked;
+  const embedThumbnail = document.getElementById(`edit-embed-thumbnail-${channelId}`).checked;
+  const downloadSubtitles = document.getElementById(`edit-download-subtitles-${channelId}`).checked;
+  const embedSubtitles = document.getElementById(`edit-embed-subtitles-${channelId}`).checked;
+  const subtitleLanguages = document.getElementById(`edit-subtitle-languages-${channelId}`).value.trim();
+  const autoSubtitles = document.getElementById(`edit-auto-subtitles-${channelId}`).checked;
+  
   // SponsorBlock options
   const sponsorblockEnabled = document.getElementById(`edit-sponsorblock-enabled-${channelId}`).checked;
   const sponsorblockMode = document.getElementById(`edit-sponsorblock-mode-${channelId}`).value;
@@ -696,6 +835,14 @@ async function saveChannelSettings(channelId, e) {
       yt_dlp_options: ytDlpOptions || null,
       rescrape_interval_days: rescrapeDays,
       profile_id: profileId,
+      download_metadata: downloadMetadata,
+      embed_metadata: embedMetadata,
+      download_thumbnail: downloadThumbnail,
+      embed_thumbnail: embedThumbnail,
+      download_subtitles: downloadSubtitles,
+      embed_subtitles: embedSubtitles,
+      subtitle_languages: subtitleLanguages || 'en',
+      auto_subtitles: autoSubtitles,
       sponsorblock_enabled: sponsorblockEnabled,
       sponsorblock_mode: sponsorblockMode,
       sponsorblock_categories: sponsorblockCategories || null
