@@ -600,7 +600,10 @@ async function viewChannel(channelId) {
             <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>
             <input type="number" id="edit-rescrape-days-${channelId}" value="${channel.rescrape_interval_days || 7}" min="1">
           </div>
-          <button type="submit" class="btn btn-primary">Save Settings</button>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <button type="button" class="btn btn-danger" onclick="deleteChannel(${channelId}); return false;" style="margin-left: auto;">Delete Channel</button>
+          </div>
         </form>
       </div>
     `;
@@ -852,6 +855,21 @@ async function saveChannelSettings(channelId, e) {
     loadChannelsPage(); // Refresh channels table
   } catch (err) {
     showNotification('Failed to save: ' + err.message, 'error');
+  }
+}
+
+async function deleteChannel(channelId) {
+  if (!confirm('Are you sure you want to delete this channel? This will also delete all associated playlists and videos.')) {
+    return;
+  }
+  
+  try {
+    await api.delete(`/api/channels/${channelId}`);
+    showNotification('Channel deleted successfully', 'success');
+    closeChannelModal();
+    loadChannelsPage(); // Refresh channels table
+  } catch (err) {
+    showNotification('Failed to delete channel: ' + err.message, 'error');
   }
 }
 
