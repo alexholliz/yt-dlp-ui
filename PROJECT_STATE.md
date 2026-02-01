@@ -931,15 +931,19 @@ open http://localhost:8189
    - Thumbnail download and embedding options
    - Metadata download and embedding options
    - Per-channel configuration
+   - **UI Design**: Toggle switches (not checkboxes)
+     - Grey oval with white circle (off state)
+     - Colored oval (e.g., blue/green) with white circle moved right (on state)
+     - Modern, intuitive on/off indication
    - **Subtitles**:
-     - UI checkbox: "Download Subtitles" → writes .srt/.vtt files alongside video
-     - UI checkbox: "Embed Subtitles" → embeds subtitles in video container
+     - Toggle: "Download Subtitles" → writes .srt/.vtt files alongside video
+     - Toggle: "Embed Subtitles" → embeds subtitles in video container
    - **Thumbnails**:
-     - UI checkbox: "Download Thumbnails" → writes .jpg/.png files alongside video
-     - UI checkbox: "Embed Thumbnails" → embeds thumbnail in video container
+     - Toggle: "Download Thumbnails" → writes .jpg/.png files alongside video
+     - Toggle: "Embed Thumbnails" → embeds thumbnail in video container
    - **Metadata**:
-     - UI checkbox: "Download Metadata" → writes .info.json file alongside video
-     - UI checkbox: "Embed Metadata" → embeds metadata in video container
+     - Toggle: "Download Metadata" → writes .info.json file alongside video
+     - Toggle: "Embed Metadata" → embeds metadata in video container
    - All options independent: can select both, either, or neither
    - Maps to yt-dlp flags: `--write-subs`, `--embed-subs`, `--write-thumbnail`, `--embed-thumbnail`, `--write-info-json`, `--embed-metadata`
 
