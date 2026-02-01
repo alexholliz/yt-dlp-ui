@@ -263,6 +263,10 @@ additional_args, created_at, updated_at
 4. **Playlist Preview Counts**: YouTube /playlists tab only shows preview (2-3 videos)
    - **Solution**: Individual refresh or download gets real count
 
+5. **Media History View**: Deleted videos remain in history view
+   - **TODO**: Update DELETE /api/videos/:id endpoint to also remove from history
+   - **Impact**: Low priority - doesn't affect functionality, just UI clarity
+
 **All critical bugs fixed as of 2026-01-31!**
 
 ### 📈 Performance Characteristics
