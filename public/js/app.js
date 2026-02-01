@@ -965,6 +965,9 @@ function updateComputedOptions(channelId, channel) {
     const computeFinal = (profile = null) => {
       const allArgs = [];
       const breakdown = [];
+      const conflicts = [];
+      
+      // NEW HIERARCHY: Toggles > Custom > Profile
       
       // 1. Format selection (from profile or default)
       const format = profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best';
@@ -986,39 +989,20 @@ function updateComputedOptions(channelId, channel) {
         flags: mergeArg
       });
       
-      // Build list of flags to filter from custom options
-      const flagsToFilter = [];
-      
-      // Filter toggle-based flags (only if toggles are ON)
-      if (downloadMetadata) flagsToFilter.push('--write-info-json');
-      if (embedMetadata) flagsToFilter.push('--embed-metadata');
-      if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
-      if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
-      if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
-      if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
-      if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
-      if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
-      
-      // Filter profile flags (always filter these)
-      if (profile) {
-        if (profile.format_selection) flagsToFilter.push('-f', '--format');
-        if (profile.merge_output_format) flagsToFilter.push('--merge-output-format');
-        
-        // Parse profile additional args and add to filter list
-        if (profile.additional_args) {
-          profile.additional_args.split(/\s+/).forEach(arg => {
-            const flagName = arg.split('=')[0];
-            if (flagName.startsWith('-')) {
-              flagsToFilter.push(flagName);
-            }
-          });
-        }
-      }
-      
-      // 3. Metadata toggles
+      // 3. Collect toggle flags (highest priority)
+      const toggleFlags = [];
       const metadataFlags = [];
-      if (downloadMetadata) metadataFlags.push('--write-info-json');
-      if (embedMetadata) metadataFlags.push('--embed-metadata');
+      const thumbnailFlags = [];
+      const subtitleFlags = [];
+      
+      if (downloadMetadata) {
+        metadataFlags.push('--write-info-json');
+        toggleFlags.push('--write-info-json');
+      }
+      if (embedMetadata) {
+        metadataFlags.push('--embed-metadata');
+        toggleFlags.push('--embed-metadata');
+      }
       if (metadataFlags.length > 0) {
         allArgs.push(...metadataFlags);
         breakdown.push({
@@ -1028,10 +1012,14 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 4. Thumbnail toggles
-      const thumbnailFlags = [];
-      if (downloadThumbnail) thumbnailFlags.push('--write-thumbnail');
-      if (embedThumbnail) thumbnailFlags.push('--embed-thumbnail');
+      if (downloadThumbnail) {
+        thumbnailFlags.push('--write-thumbnail');
+        toggleFlags.push('--write-thumbnail');
+      }
+      if (embedThumbnail) {
+        thumbnailFlags.push('--embed-thumbnail');
+        toggleFlags.push('--embed-thumbnail');
+      }
       if (thumbnailFlags.length > 0) {
         allArgs.push(...thumbnailFlags);
         breakdown.push({
@@ -1041,14 +1029,22 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 5. Subtitle options
-      const subtitleFlags = [];
       if (downloadSubtitles || embedSubtitles) {
         const langs = subtitleLanguages || 'en';
         subtitleFlags.push(`--sub-langs ${langs}`);
-        if (downloadSubtitles) subtitleFlags.push('--write-subs');
-        if (embedSubtitles) subtitleFlags.push('--embed-subs');
-        if (autoSubtitles) subtitleFlags.push('--write-auto-subs');
+        toggleFlags.push('--sub-lang', '--sub-langs');
+        if (downloadSubtitles) {
+          subtitleFlags.push('--write-subs');
+          toggleFlags.push('--write-subs', '--write-subtitles');
+        }
+        if (embedSubtitles) {
+          subtitleFlags.push('--embed-subs');
+          toggleFlags.push('--embed-subs', '--embed-subtitles');
+        }
+        if (autoSubtitles) {
+          subtitleFlags.push('--write-auto-subs');
+          toggleFlags.push('--write-auto-subs', '--write-automatic-subs');
+        }
       }
       if (subtitleFlags.length > 0) {
         allArgs.push(...subtitleFlags);
@@ -1059,7 +1055,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 6. SponsorBlock options
+      // 4. SponsorBlock options
       if (sponsorblockEnabled) {
         const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
           .map(cb => cb.value).join(',');
@@ -1075,21 +1071,9 @@ function updateComputedOptions(channelId, channel) {
         }
       }
       
-      // 7. Profile additional args
-      if (profile && profile.additional_args) {
-        const profileArgs = profile.additional_args.split(/\s+/);
-        allArgs.push(...profileArgs);
-        breakdown.push({
-          icon: '🎯',
-          source: 'yt-dlp Profile (additional)',
-          flags: profile.additional_args
-        });
-      }
-      
-      // 8. Detect conflicts/duplicates and filter custom options
+      // 5. Filter and add custom options (filter by toggles only, track custom flags)
+      const customFlags = [];
       const customFiltered = [];
-      const conflicts = [];
-      
       if (customOptions) {
         const customArgsParsed = customOptions.split(/\s+/);
         
@@ -1097,80 +1081,17 @@ function updateComputedOptions(channelId, channel) {
           const arg = customArgsParsed[i];
           const argWithoutValue = arg.split('=')[0];
           
-          // Check if this flag should be filtered
-          if (flagsToFilter.includes(argWithoutValue)) {
-            // Determine what's overriding this custom option
-            let overrideSource = '';
-            let overrideIcon = '';
-            let overrideFlag = argWithoutValue;
-            
-            // Check toggles first (highest priority)
-            if (downloadMetadata && argWithoutValue === '--write-info-json') {
-              overrideSource = 'Metadata Toggle (download)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--write-info-json';
-            } else if (embedMetadata && argWithoutValue === '--embed-metadata') {
-              overrideSource = 'Metadata Toggle (embed)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--embed-metadata';
-            } else if (downloadThumbnail && argWithoutValue === '--write-thumbnail') {
-              overrideSource = 'Thumbnail Toggle (download)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--write-thumbnail';
-            } else if (embedThumbnail && argWithoutValue === '--embed-thumbnail') {
-              overrideSource = 'Thumbnail Toggle (embed)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--embed-thumbnail';
-            } else if ((downloadSubtitles || embedSubtitles) && (argWithoutValue === '--sub-lang' || argWithoutValue === '--sub-langs')) {
-              overrideSource = 'Subtitle Toggle (language)';
-              overrideIcon = '🎚️';
-              overrideFlag = `--sub-langs ${subtitleLanguages || 'en'}`;
-            } else if (downloadSubtitles && (argWithoutValue === '--write-subs' || argWithoutValue === '--write-subtitles')) {
-              overrideSource = 'Subtitle Toggle (download)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--write-subs';
-            } else if (embedSubtitles && (argWithoutValue === '--embed-subs' || argWithoutValue === '--embed-subtitles')) {
-              overrideSource = 'Subtitle Toggle (embed)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--embed-subs';
-            } else if (autoSubtitles && (argWithoutValue === '--write-auto-subs' || argWithoutValue === '--write-automatic-subs')) {
-              overrideSource = 'Subtitle Toggle (auto)';
-              overrideIcon = '🎚️';
-              overrideFlag = '--write-auto-subs';
-            } 
-            // Check profile (second priority)
-            else if (profile) {
-              if (profile.format_selection && (argWithoutValue === '-f' || argWithoutValue === '--format')) {
-                overrideSource = 'yt-dlp Profile (format)';
-                overrideIcon = '🎯';
-                overrideFlag = `-f "${profile.format_selection}"`;
-              } else if (profile.merge_output_format && argWithoutValue === '--merge-output-format') {
-                overrideSource = 'yt-dlp Profile (merge)';
-                overrideIcon = '🎯';
-                overrideFlag = `--merge-output-format ${profile.merge_output_format}`;
-              } else if (profile.additional_args) {
-                // Check if this flag is in profile additional args
-                const profileArgs = profile.additional_args.split(/\s+/);
-                if (profileArgs.some(pArg => pArg.split('=')[0] === argWithoutValue)) {
-                  overrideSource = 'yt-dlp Profile (additional)';
-                  overrideIcon = '🎯';
-                  overrideFlag = profileArgs.find(pArg => pArg.split('=')[0] === argWithoutValue) || argWithoutValue;
-                }
-              }
-            }
-            
-            // Collect the full custom argument (flag + value if present)
+          // Check if toggle overrides this
+          if (toggleFlags.includes(argWithoutValue)) {
+            // Collect full argument for conflict detection
             let fullCustomArg = arg;
             let valueTokens = [];
             
-            // Skip this flag and collect value if present
             if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
               const nextToken = customArgsParsed[i + 1];
               if (!nextToken.startsWith('-')) {
-                i++; // Skip the value token
+                i++;
                 valueTokens.push(nextToken);
-                
-                // If value starts with quote, consume until closing quote
                 if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
                   while (i + 1 < customArgsParsed.length && !customArgsParsed[i].endsWith('"')) {
                     i++;
@@ -1179,6 +1100,37 @@ function updateComputedOptions(channelId, channel) {
                 }
                 fullCustomArg = `${arg} ${valueTokens.join(' ')}`;
               }
+            }
+            
+            // Determine which toggle is overriding
+            let overrideSource = '';
+            let overrideIcon = '🎚️';
+            let overrideFlag = argWithoutValue;
+            
+            if (downloadMetadata && argWithoutValue === '--write-info-json') {
+              overrideSource = 'Metadata Toggle (download)';
+              overrideFlag = '--write-info-json';
+            } else if (embedMetadata && argWithoutValue === '--embed-metadata') {
+              overrideSource = 'Metadata Toggle (embed)';
+              overrideFlag = '--embed-metadata';
+            } else if (downloadThumbnail && argWithoutValue === '--write-thumbnail') {
+              overrideSource = 'Thumbnail Toggle (download)';
+              overrideFlag = '--write-thumbnail';
+            } else if (embedThumbnail && argWithoutValue === '--embed-thumbnail') {
+              overrideSource = 'Thumbnail Toggle (embed)';
+              overrideFlag = '--embed-thumbnail';
+            } else if ((downloadSubtitles || embedSubtitles) && (argWithoutValue === '--sub-lang' || argWithoutValue === '--sub-langs')) {
+              overrideSource = 'Subtitle Toggle (language)';
+              overrideFlag = `--sub-langs ${subtitleLanguages || 'en'}`;
+            } else if (downloadSubtitles && (argWithoutValue === '--write-subs' || argWithoutValue === '--write-subtitles')) {
+              overrideSource = 'Subtitle Toggle (download)';
+              overrideFlag = '--write-subs';
+            } else if (embedSubtitles && (argWithoutValue === '--embed-subs' || argWithoutValue === '--embed-subtitles')) {
+              overrideSource = 'Subtitle Toggle (embed)';
+              overrideFlag = '--embed-subs';
+            } else if (autoSubtitles && (argWithoutValue === '--write-auto-subs' || argWithoutValue === '--write-automatic-subs')) {
+              overrideSource = 'Subtitle Toggle (auto)';
+              overrideFlag = '--write-auto-subs';
             }
             
             if (overrideSource) {
@@ -1192,6 +1144,10 @@ function updateComputedOptions(channelId, channel) {
           } else {
             customFiltered.push(arg);
             allArgs.push(arg);
+            // Track custom flag for filtering profile
+            if (argWithoutValue.startsWith('-')) {
+              customFlags.push(argWithoutValue);
+            }
           }
         }
       }
@@ -1203,7 +1159,44 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 9. Check for filesystem options
+      // 6. Filter and add profile additional args (filter by toggles AND custom)
+      const profileFiltered = [];
+      if (profile && profile.additional_args) {
+        const profileArgsParsed = profile.additional_args.split(/\s+/);
+        const filterList = [...toggleFlags, ...customFlags];
+        
+        for (let i = 0; i < profileArgsParsed.length; i++) {
+          const arg = profileArgsParsed[i];
+          const argWithoutValue = arg.split('=')[0];
+          
+          if (filterList.includes(argWithoutValue)) {
+            // Skip this flag and its value
+            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
+              const nextToken = profileArgsParsed[i + 1];
+              if (!nextToken.startsWith('-')) {
+                i++;
+                if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                  while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
+                    i++;
+                  }
+                }
+              }
+            }
+          } else {
+            profileFiltered.push(arg);
+            allArgs.push(arg);
+          }
+        }
+      }
+      if (profileFiltered.length > 0) {
+        breakdown.push({
+          icon: '🎯',
+          source: 'yt-dlp Profile (additional)',
+          flags: profileFiltered.join(' ')
+        });
+      }
+      
+      // 7. Check for filesystem options
       const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
       const hasFilesystemOption = allArgs.some(arg => filesystemOptions.includes(arg));
       
