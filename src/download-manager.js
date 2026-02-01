@@ -233,6 +233,12 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
+    // Get profile if selected
+    let profile = null;
+    if (channel.profile_id) {
+      profile = this.db.getProfile(channel.profile_id);
+    }
+
     // Build list of flags to filter from custom options (only if corresponding toggle is ON)
     const flagsToFilter = [];
     
@@ -302,8 +308,14 @@ class DownloadManager {
       }
     }
 
-    // Combine all args: enhanced options + SponsorBlock + filtered custom args
-    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, filteredCustomArgs]
+    // Add profile additional args if present
+    let profileAdditionalArgs = '';
+    if (profile && profile.additional_args) {
+      profileAdditionalArgs = profile.additional_args;
+    }
+
+    // Combine all args: enhanced options + SponsorBlock + profile additional + filtered custom args
+    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, profileAdditionalArgs, filteredCustomArgs]
       .filter(Boolean)
       .join(' ')
       .trim() || null;
@@ -311,8 +323,8 @@ class DownloadManager {
     return {
       outputPath: this.downloadsPath,
       outputTemplate,
-      format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
-      mergeOutputFormat: 'mp4',
+      format: profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
+      mergeOutputFormat: profile?.merge_output_format || 'mp4',
       // Metadata options (handled by ytdlp-service)
       writeInfoJson: channel.download_metadata,
       embedMetadata: channel.embed_metadata,

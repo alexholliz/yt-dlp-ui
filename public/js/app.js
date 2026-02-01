@@ -946,15 +946,26 @@ function updateComputedOptions(channelId, channel) {
     const customOptions = document.getElementById(`edit-yt-dlp-options-${channelId}`)?.value.trim();
     const profileId = document.getElementById(`edit-profile-${channelId}`)?.value;
     
-    const computeFinal = (profileOpts = []) => {
+    const computeFinal = (profile = null) => {
       const allArgs = [];
       
-      // 1. Add toggle-based options
+      // 1. Format selection (from profile or default)
+      const format = profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best';
+      allArgs.push(`-f "${format}"`);
+      
+      // 2. Merge output format (from profile or default)
+      const mergeFormat = profile?.merge_output_format || 'mp4';
+      allArgs.push(`--merge-output-format ${mergeFormat}`);
+      
+      // 3. Metadata toggles (converted to flags by ytdlp-service)
       if (downloadMetadata) allArgs.push('--write-info-json');
       if (embedMetadata) allArgs.push('--embed-metadata');
+      
+      // 4. Thumbnail toggles (converted to flags by ytdlp-service)
       if (downloadThumbnail) allArgs.push('--write-thumbnail');
       if (embedThumbnail) allArgs.push('--embed-thumbnail');
       
+      // 5. Subtitle options (in customArgs)
       if (downloadSubtitles || embedSubtitles) {
         const langs = subtitleLanguages || 'en';
         allArgs.push(`--sub-langs ${langs}`);
@@ -963,7 +974,7 @@ function updateComputedOptions(channelId, channel) {
         if (autoSubtitles) allArgs.push('--write-auto-subs');
       }
       
-      // 2. Add SponsorBlock options
+      // 6. SponsorBlock options (in customArgs)
       if (sponsorblockEnabled) {
         const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
           .map(cb => cb.value).join(',');
@@ -973,10 +984,12 @@ function updateComputedOptions(channelId, channel) {
         }
       }
       
-      // 3. Add profile options (parsed)
-      profileOpts.forEach(opt => allArgs.push(opt));
+      // 7. Profile additional args (in customArgs)
+      if (profile && profile.additional_args) {
+        profile.additional_args.split(/\s+/).forEach(arg => allArgs.push(arg));
+      }
       
-      // 4. Filter and add custom options
+      // 8. Filter and add custom options (filtered against toggles only)
       const flagsToFilter = [];
       if (downloadMetadata) flagsToFilter.push('--write-info-json');
       if (embedMetadata) flagsToFilter.push('--embed-metadata');
@@ -988,8 +1001,7 @@ function updateComputedOptions(channelId, channel) {
       if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
       
       if (customOptions) {
-        const customArgsParsed = customOptions.split(/\s+/);
-        customArgsParsed.forEach(arg => {
+        customOptions.split(/\s+/).forEach(arg => {
           const argWithoutValue = arg.split('=')[0];
           if (!flagsToFilter.includes(argWithoutValue)) {
             allArgs.push(arg);
@@ -997,36 +1009,16 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 5. Deduplicate: keep first occurrence of each flag
-      const seen = new Set();
-      const deduplicated = [];
+      // 9. Add fixed flags that are always present
+      allArgs.push('--no-restrict-filenames');
       
-      for (const arg of allArgs) {
-        const key = arg.split('=')[0].split(' ')[0]; // Get flag without value
-        if (!seen.has(key) && key.startsWith('-')) {
-          seen.add(key);
-          deduplicated.push(arg);
-        } else if (!key.startsWith('-')) {
-          // Not a flag (e.g., value part), keep it
-          deduplicated.push(arg);
-        }
-      }
-      
-      return deduplicated.length > 0 ? deduplicated.join(' ') : '(no additional options)';
+      return allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)';
     };
     
     // Fetch profile if selected, otherwise compute immediately
     if (profileId) {
       api.get(`/api/profiles/${profileId}`).then(profile => {
-        const profileOpts = [];
-        if (profile.format_selection) profileOpts.push(`-f "${profile.format_selection}"`);
-        if (profile.merge_output_format) profileOpts.push(`--merge-output-format ${profile.merge_output_format}`);
-        if (profile.additional_args) {
-          // Parse additional args instead of adding as single string
-          profile.additional_args.split(/\s+/).forEach(arg => profileOpts.push(arg));
-        }
-        
-        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal(profileOpts);
+        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal(profile);
       }).catch(() => {
         document.getElementById(`computed-options-${channelId}`).textContent = computeFinal();
       });
