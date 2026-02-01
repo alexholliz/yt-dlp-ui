@@ -330,6 +330,89 @@
             </label>
           </div>
 
+          <!-- Enhanced yt-dlp Options -->
+          <div class="content-box" style="margin: 1rem 0;">
+            <h3>Enhanced yt-dlp Options</h3>
+            
+            <!-- Metadata Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Metadata</label>
+              <label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="download-metadata">
+                  <span class="toggle-slider"></span>
+                </div>
+                Download Metadata
+              </label>
+              <label style="margin-left: 1rem;">
+                <div class="toggle-switch">
+                  <input type="checkbox" id="embed-metadata" checked>
+                  <span class="toggle-slider"></span>
+                </div>
+                Embed Metadata
+              </label>
+              <small style="display: block; margin-top: 0.25rem;">Download writes .info.json file. Embed adds metadata to video file.</small>
+            </div>
+
+            <!-- Thumbnail Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Thumbnails</label>
+              <label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="download-thumbnail">
+                  <span class="toggle-slider"></span>
+                </div>
+                Download Thumbnail
+              </label>
+              <label style="margin-left: 1rem;">
+                <div class="toggle-switch">
+                  <input type="checkbox" id="embed-thumbnail">
+                  <span class="toggle-slider"></span>
+                </div>
+                Embed Thumbnail
+              </label>
+              <small style="display: block; margin-top: 0.25rem;">Download writes image file. Embed adds thumbnail to video file.</small>
+            </div>
+
+            <!-- Subtitle Options -->
+            <div class="form-group">
+              <label style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Subtitles</label>
+              <label>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="download-subtitles">
+                  <span class="toggle-slider"></span>
+                </div>
+                Download Subtitles
+              </label>
+              <label style="margin-left: 1rem;">
+                <div class="toggle-switch">
+                  <input type="checkbox" id="embed-subtitles">
+                  <span class="toggle-slider"></span>
+                </div>
+                Embed Subtitles
+              </label>
+              <small style="display: block; margin-top: 0.25rem;">Download writes .srt/.vtt files. Embed burns subtitles into video.</small>
+            </div>
+
+            <div id="subtitle-settings" style="display: none; margin-left: 1rem; padding-left: 1rem; border-left: 2px solid var(--border);">
+              <div class="form-group">
+                <label for="subtitle-languages">Subtitle Languages</label>
+                <input type="text" id="subtitle-languages" value="en" placeholder="en">
+                <small>Comma-separated language codes (e.g., en,de,es,fr)</small>
+              </div>
+              <div class="form-group">
+                <label>
+                  <div class="toggle-switch">
+                    <input type="checkbox" id="auto-subtitles">
+                    <span class="toggle-slider"></span>
+                  </div>
+                  Auto-generated Subtitles
+                </label>
+                <small style="display: block; margin-top: 0.25rem;">If enabled, downloads auto-generated subtitles when manual ones aren't available</small>
+              </div>
+            </div>
+          </div>
+
           <!-- SponsorBlock Options -->
           <div class="content-box" style="margin: 1rem 0;">
             <h3>SponsorBlock Options</h3>

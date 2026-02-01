@@ -92,6 +92,16 @@ function setupEventListeners() {
   document.getElementById('sponsorblock-enabled').addEventListener('change', (e) => {
     document.getElementById('sponsorblock-settings').style.display = e.target.checked ? 'block' : 'none';
   });
+
+  // Enhanced yt-dlp options - show subtitle settings when either subtitle option is enabled
+  const updateSubtitleSettings = () => {
+    const downloadSubs = document.getElementById('download-subtitles').checked;
+    const embedSubs = document.getElementById('embed-subtitles').checked;
+    document.getElementById('subtitle-settings').style.display = (downloadSubs || embedSubs) ? 'block' : 'none';
+  };
+  
+  document.getElementById('download-subtitles').addEventListener('change', updateSubtitleSettings);
+  document.getElementById('embed-subtitles').addEventListener('change', updateSubtitleSettings);
 }
 
 async function loadHomePage() {
@@ -575,6 +585,16 @@ async function handleAddChannel(e) {
   const rescrapeDays = parseInt(document.getElementById('rescrape-days').value);
   const profileId = document.getElementById('profile-select').value || null;
   
+  // Enhanced yt-dlp options
+  const downloadMetadata = document.getElementById('download-metadata').checked;
+  const embedMetadata = document.getElementById('embed-metadata').checked;
+  const downloadThumbnail = document.getElementById('download-thumbnail').checked;
+  const embedThumbnail = document.getElementById('embed-thumbnail').checked;
+  const downloadSubtitles = document.getElementById('download-subtitles').checked;
+  const embedSubtitles = document.getElementById('embed-subtitles').checked;
+  const subtitleLanguages = document.getElementById('subtitle-languages').value.trim();
+  const autoSubtitles = document.getElementById('auto-subtitles').checked;
+  
   // SponsorBlock options
   const sponsorblockEnabled = document.getElementById('sponsorblock-enabled').checked;
   const sponsorblockMode = document.getElementById('sponsorblock-mode').value;
@@ -591,6 +611,14 @@ async function handleAddChannel(e) {
       flat_mode: flatMode, auto_add_new_playlists: autoAddPlaylists,
       yt_dlp_options: ytDlpOptions || null, rescrape_interval_days: rescrapeDays,
       profile_id: profileId,
+      download_metadata: downloadMetadata,
+      embed_metadata: embedMetadata,
+      download_thumbnail: downloadThumbnail,
+      embed_thumbnail: embedThumbnail,
+      download_subtitles: downloadSubtitles,
+      embed_subtitles: embedSubtitles,
+      subtitle_languages: subtitleLanguages || 'en',
+      auto_subtitles: autoSubtitles,
       sponsorblock_enabled: sponsorblockEnabled,
       sponsorblock_mode: sponsorblockMode,
       sponsorblock_categories: sponsorblockCategories || null

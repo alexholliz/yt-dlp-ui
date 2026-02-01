@@ -203,8 +203,50 @@ class DB {
         this.save();
         console.log('Migration: Added enabled column to channels table');
       }
+      
+      // Enhanced yt-dlp options
+      if (!columns.includes('download_metadata')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN download_metadata BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added download_metadata column to channels table');
+      }
+      if (!columns.includes('embed_metadata')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN embed_metadata BOOLEAN DEFAULT 1");
+        this.save();
+        console.log('Migration: Added embed_metadata column to channels table');
+      }
+      if (!columns.includes('download_thumbnail')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN download_thumbnail BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added download_thumbnail column to channels table');
+      }
+      if (!columns.includes('embed_thumbnail')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN embed_thumbnail BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added embed_thumbnail column to channels table');
+      }
+      if (!columns.includes('download_subtitles')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN download_subtitles BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added download_subtitles column to channels table');
+      }
+      if (!columns.includes('embed_subtitles')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN embed_subtitles BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added embed_subtitles column to channels table');
+      }
+      if (!columns.includes('subtitle_languages')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN subtitle_languages TEXT DEFAULT 'en'");
+        this.save();
+        console.log('Migration: Added subtitle_languages column to channels table');
+      }
+      if (!columns.includes('auto_subtitles')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN auto_subtitles BOOLEAN DEFAULT 0");
+        this.save();
+        console.log('Migration: Added auto_subtitles column to channels table');
+      }
     } catch (err) {
-      console.warn('Migration check for SponsorBlock failed:', err.message);
+      console.warn('Migration check failed:', err.message);
     }
   }
 
@@ -267,9 +309,11 @@ class DB {
     const stmt = this.db.prepare(`
       INSERT INTO channels (
         url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, 
-        rescrape_interval_days, profile_id, sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
+        rescrape_interval_days, profile_id, sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories,
+        download_metadata, embed_metadata, download_thumbnail, embed_thumbnail,
+        download_subtitles, embed_subtitles, subtitle_languages, auto_subtitles
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run([
       url,
@@ -281,7 +325,15 @@ class DB {
       options.profile_id || null,
       options.sponsorblock_enabled ? 1 : 0,
       options.sponsorblock_mode || 'mark',
-      options.sponsorblock_categories || null
+      options.sponsorblock_categories || null,
+      options.download_metadata ? 1 : 0,
+      options.embed_metadata ? 1 : 0,
+      options.download_thumbnail ? 1 : 0,
+      options.embed_thumbnail ? 1 : 0,
+      options.download_subtitles ? 1 : 0,
+      options.embed_subtitles ? 1 : 0,
+      options.subtitle_languages || 'en',
+      options.auto_subtitles ? 1 : 0
     ]);
     const result = this.db.exec('SELECT last_insert_rowid() as id');
     this.save();
@@ -351,6 +403,40 @@ class DB {
     if (data.enabled !== undefined) {
       fields.push('enabled = ?');
       values.push(data.enabled ? 1 : 0);
+    }
+    
+    // Enhanced yt-dlp options
+    if (data.download_metadata !== undefined) {
+      fields.push('download_metadata = ?');
+      values.push(data.download_metadata ? 1 : 0);
+    }
+    if (data.embed_metadata !== undefined) {
+      fields.push('embed_metadata = ?');
+      values.push(data.embed_metadata ? 1 : 0);
+    }
+    if (data.download_thumbnail !== undefined) {
+      fields.push('download_thumbnail = ?');
+      values.push(data.download_thumbnail ? 1 : 0);
+    }
+    if (data.embed_thumbnail !== undefined) {
+      fields.push('embed_thumbnail = ?');
+      values.push(data.embed_thumbnail ? 1 : 0);
+    }
+    if (data.download_subtitles !== undefined) {
+      fields.push('download_subtitles = ?');
+      values.push(data.download_subtitles ? 1 : 0);
+    }
+    if (data.embed_subtitles !== undefined) {
+      fields.push('embed_subtitles = ?');
+      values.push(data.embed_subtitles ? 1 : 0);
+    }
+    if (data.subtitle_languages !== undefined) {
+      fields.push('subtitle_languages = ?');
+      values.push(data.subtitle_languages);
+    }
+    if (data.auto_subtitles !== undefined) {
+      fields.push('auto_subtitles = ?');
+      values.push(data.auto_subtitles ? 1 : 0);
     }
 
     fields.push('updated_at = strftime("%s", "now")');
