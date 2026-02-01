@@ -982,7 +982,14 @@ db.ready.then(() => {
   app.post('/api/youtube-api/test', async (req, res) => {
     try {
       const { apiKey } = req.body;
-      const result = await youtubeApi.testApiKey(apiKey);
+      // If no apiKey provided in request, use the saved key
+      const keyToTest = apiKey || youtubeApi.apiKey;
+      
+      if (!keyToTest) {
+        return res.status(400).json({ valid: false, error: 'No API key provided or saved' });
+      }
+      
+      const result = await youtubeApi.testApiKey(keyToTest);
       res.json(result);
     } catch (err) {
       logger.error('Failed to test YouTube API key:', err);

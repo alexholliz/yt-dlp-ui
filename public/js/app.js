@@ -851,17 +851,32 @@ async function saveYouTubeApiKey() {
   try {
     await api.post('/api/youtube-api/key', { apiKey });
     showNotification('YouTube API key saved successfully', 'success');
-    await loadYouTubeApiQuota();
+    document.getElementById('youtube-api-key').value = ''; // Clear input after save
+    await loadConfigPage(); // Reload to show quota
   } catch (err) {
     showNotification('Failed to save API key: ' + err.message, 'error');
   }
 }
 
 async function testYouTubeApiKey() {
-  const apiKey = document.getElementById('youtube-api-key').value.trim();
+  // First, check if there's a key in the input field
+  let apiKey = document.getElementById('youtube-api-key').value.trim();
+  
+  // If no key in input, check if there's a saved key
   if (!apiKey) {
-    showNotification('Please enter an API key', 'error');
-    return;
+    try {
+      const keyStatus = await api.get('/api/youtube-api/key');
+      if (!keyStatus.hasKey) {
+        showNotification('Please enter an API key to test, or save one first', 'error');
+        return;
+      }
+      // Test the saved key (server-side will use the saved key)
+      showNotification('Testing saved API key...', 'info');
+      apiKey = null; // Signal to server to use saved key
+    } catch (err) {
+      showNotification('No API key available to test', 'error');
+      return;
+    }
   }
   
   try {
@@ -931,19 +946,22 @@ async function loadConfigPage() {
   try {
     const keyStatus = await api.get('/api/youtube-api/key');
     const quotaStatusDiv = document.getElementById('youtube-api-quota-status');
+    const apiKeyInput = document.getElementById('youtube-api-key');
     
     if (keyStatus.hasKey) {
       // Has key - show placeholder and load quota
-      document.getElementById('youtube-api-key').placeholder = `API key saved (${keyStatus.keyLength} characters)`;
+      apiKeyInput.placeholder = `API key saved (${keyStatus.keyLength} characters)`;
       await loadYouTubeApiQuota();
     } else {
-      // No key - show helper text
+      // No key - show default placeholder and helper text
+      apiKeyInput.placeholder = 'Enter your YouTube Data API v3 key';
       if (quotaStatusDiv) {
         quotaStatusDiv.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Add an API key above to see quota information</p>';
       }
     }
   } catch (err) {
     console.error('Failed to load API key status:', err);
+    document.getElementById('youtube-api-key').placeholder = 'Enter your YouTube Data API v3 key';
   }
   
   // Auto-load cookies if they exist
