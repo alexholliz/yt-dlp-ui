@@ -291,25 +291,19 @@ db.ready.then(() => {
       const deleteFiles = req.query.deleteFiles === 'true';
       
       if (deleteFiles) {
-        // Get channel info and all videos before deleting from DB
+        // Get channel info before deleting from DB
         const channel = db.getChannel(channelId);
-        const videos = db.getVideosByChannel(channelId);
         
-        if (channel && videos.length > 0) {
-          const fs = require('fs');
-          const path = require('path');
-          
+        if (channel && channel.channel_name) {
           // Delete channel folder
-          const channelFolderPattern = channel.channel_name 
-            ? `${channel.channel_name} [${channel.channel_id}]`
-            : null;
+          const channelFolderPattern = `${channel.channel_name} [${channel.channel_id}]`;
+          const channelPath = path.join(DOWNLOADS_PATH, channelFolderPattern);
           
-          if (channelFolderPattern) {
-            const channelPath = path.join(downloadsPath, channelFolderPattern);
-            if (fs.existsSync(channelPath)) {
-              fs.rmSync(channelPath, { recursive: true, force: true });
-              logger.info(`Deleted channel folder: ${channelPath}`);
-            }
+          if (fs.existsSync(channelPath)) {
+            fs.rmSync(channelPath, { recursive: true, force: true });
+            logger.info(`Deleted channel folder: ${channelPath}`);
+          } else {
+            logger.warn(`Channel folder not found: ${channelPath}`);
           }
         }
       }
