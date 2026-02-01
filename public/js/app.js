@@ -328,51 +328,29 @@ async function loadProfilesPage() {
   }
 }
 
-function loadConfigPage() {
+async function loadConfigPage() {
   loadCookies();
   loadSchedulerStatus();
-  checkAndShowApiQuota();
+  await checkAndShowApiQuota(); // Check if API key exists first
 }
 
-// Check for API key and show/hide quota tracker
+// Check for API key and conditionally show/hide quota section
 async function checkAndShowApiQuota() {
   try {
     const response = await api.get('/api/youtube-api/key');
-    const quotaSection = document.getElementById('api-quota-section');
+    const quotaStatusDiv = document.getElementById('youtube-api-quota-status');
     
-    if (quotaSection) {
+    if (quotaStatusDiv) {
       if (response.hasKey) {
-        quotaSection.style.display = 'block';
-        loadApiQuota();
+        // Has key - load and display quota
+        await loadYouTubeApiQuota();
       } else {
-        quotaSection.style.display = 'none';
+        // No key - hide the quota display
+        quotaStatusDiv.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Add an API key above to see quota information</p>';
       }
     }
   } catch (err) {
     console.error('Failed to check API key:', err);
-    const quotaSection = document.getElementById('api-quota-section');
-    if (quotaSection) {
-      quotaSection.style.display = 'none';
-    }
-  }
-}
-
-// Load API quota information
-async function loadApiQuota() {
-  try {
-    const quota = await api.get('/api/youtube-api/quota');
-    const quotaDisplay = document.getElementById('api-quota-display');
-    if (quotaDisplay && quota) {
-      const percentUsed = ((quota.used / quota.limit) * 100).toFixed(1);
-      quotaDisplay.innerHTML = `
-        <p><strong>API Quota:</strong> ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} (${percentUsed}%)</p>
-        <div class="progress-bar">
-          <div class="progress-fill" style="width: ${percentUsed}%; background: ${percentUsed > 80 ? 'var(--error)' : 'var(--success)'}"></div>
-        </div>
-      `;
-    }
-  } catch (err) {
-    console.error('Failed to load API quota:', err);
   }
 }
 
@@ -930,15 +908,18 @@ function displayQuotaStatus(quota) {
   const percentUsed = (quota.used / quota.limit * 100).toFixed(1);
   const resetTime = new Date(quota.resetTime).toLocaleString();
   
-  let colorClass = 'success';
-  if (percentUsed > 80) colorClass = 'error';
-  else if (percentUsed > 50) colorClass = 'warning';
+  let barColor = 'var(--success)';
+  if (percentUsed > 80) barColor = 'var(--error)';
+  else if (percentUsed > 50) barColor = 'var(--warning)';
   
   statusDiv.innerHTML = `
-    <div style="padding: 0.75rem; background: var(--background); border-radius: 4px; border: 1px solid var(--border);">
-      <strong>Quota Status:</strong> ${quota.used} / ${quota.limit} units used (${percentUsed}%)<br>
+    <div style="padding: 1rem; background: var(--surface); border-radius: 8px; border: 1px solid var(--border);">
+      <p style="margin-bottom: 0.5rem;"><strong>API Quota:</strong> ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} units (${percentUsed}%)</p>
+      <div style="width: 100%; height: 8px; background: var(--background); border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem;">
+        <div style="width: ${percentUsed}%; height: 100%; background: ${barColor}; transition: all 0.3s ease;"></div>
+      </div>
       <small style="color: var(--text-muted);">
-        Remaining: ${quota.remaining} units • Resets: ${resetTime}
+        Remaining: ${quota.remaining.toLocaleString()} units • Resets: ${resetTime}
       </small>
       ${quota.remaining < 100 ? '<br><small style="color: var(--error);">⚠️ Low quota - will fallback to yt-dlp soon</small>' : ''}
     </div>
@@ -946,12 +927,20 @@ function displayQuotaStatus(quota) {
 }
 
 async function loadConfigPage() {
-  // Load existing API key status
+  // Check for API key and load quota if present
   try {
     const keyStatus = await api.get('/api/youtube-api/key');
+    const quotaStatusDiv = document.getElementById('youtube-api-quota-status');
+    
     if (keyStatus.hasKey) {
+      // Has key - show placeholder and load quota
       document.getElementById('youtube-api-key').placeholder = `API key saved (${keyStatus.keyLength} characters)`;
       await loadYouTubeApiQuota();
+    } else {
+      // No key - show helper text
+      if (quotaStatusDiv) {
+        quotaStatusDiv.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Add an API key above to see quota information</p>';
+      }
     }
   } catch (err) {
     console.error('Failed to load API key status:', err);
@@ -967,6 +956,9 @@ async function loadConfigPage() {
     // No cookies file exists yet, that's fine
     console.debug('No cookies file found (this is normal for new installs)');
   }
+  
+  loadCookies();
+  loadSchedulerStatus();
 }
 
 function showAddChannelModal() {
