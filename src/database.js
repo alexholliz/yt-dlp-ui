@@ -540,6 +540,7 @@ class DB {
         c.url,
         c.playlist_mode,
         c.last_scraped_at,
+        c.enabled,
         COUNT(CASE WHEN v.download_status = 'pending' THEN 1 END) as pending_count,
         COUNT(CASE WHEN v.download_status = 'completed' THEN 1 END) as completed_count,
         SUM(CASE WHEN v.download_status = 'completed' THEN v.file_size ELSE 0 END) as total_size,
