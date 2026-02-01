@@ -233,6 +233,41 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
+    // Build enhanced yt-dlp options
+    const enhancedArgs = [];
+    
+    // Metadata options
+    if (channel.download_metadata) {
+      enhancedArgs.push('--write-info-json');
+    }
+    if (channel.embed_metadata) {
+      enhancedArgs.push('--embed-metadata');
+    }
+    
+    // Thumbnail options
+    if (channel.download_thumbnail) {
+      enhancedArgs.push('--write-thumbnail');
+    }
+    if (channel.embed_thumbnail) {
+      enhancedArgs.push('--embed-thumbnail');
+    }
+    
+    // Subtitle options
+    if (channel.download_subtitles || channel.embed_subtitles) {
+      const languages = channel.subtitle_languages || 'en';
+      enhancedArgs.push(`--sub-langs ${languages}`);
+      
+      if (channel.download_subtitles) {
+        enhancedArgs.push('--write-subs');
+      }
+      if (channel.embed_subtitles) {
+        enhancedArgs.push('--embed-subs');
+      }
+      if (channel.auto_subtitles) {
+        enhancedArgs.push('--write-auto-subs');
+      }
+    }
+
     // Build SponsorBlock arguments if enabled
     let sponsorblockArgs = '';
     if (channel.sponsorblock_enabled && channel.sponsorblock_categories) {
@@ -246,8 +281,8 @@ class DownloadManager {
       }
     }
 
-    // Combine custom args with SponsorBlock args
-    const customArgs = [channel.yt_dlp_options, sponsorblockArgs]
+    // Combine all args: enhanced options + SponsorBlock + custom args
+    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, channel.yt_dlp_options]
       .filter(Boolean)
       .join(' ')
       .trim() || null;
@@ -257,9 +292,9 @@ class DownloadManager {
       outputTemplate,
       format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
       mergeOutputFormat: 'mp4',
-      writeInfoJson: true,
+      writeInfoJson: channel.embed_metadata || channel.download_metadata, // Keep for backwards compat
       noRestrictFilenames: true,
-      writeThumbnail: true,
+      writeThumbnail: channel.embed_thumbnail || channel.download_thumbnail, // Keep for backwards compat
       downloadArchive: path.join(this.downloadsPath, '.downloaded'),
       customArgs,
       playlistMetadata: {
