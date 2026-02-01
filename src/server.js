@@ -149,7 +149,13 @@ db.ready.then(() => {
   // Add new channel
   app.post('/api/channels', async (req, res) => {
     try {
-      const { url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, rescrape_interval_days, profile_id } = req.body;
+      const { 
+        url, playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, 
+        rescrape_interval_days, profile_id,
+        download_metadata, embed_metadata, download_thumbnail, embed_thumbnail,
+        download_subtitles, embed_subtitles, subtitle_languages, auto_subtitles,
+        sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
+      } = req.body;
 
       if (!url) {
         return res.status(400).json({ error: 'URL is required' });
@@ -186,7 +192,18 @@ db.ready.then(() => {
         auto_add_new_playlists,
         yt_dlp_options,
         rescrape_interval_days,
-        profile_id
+        profile_id,
+        download_metadata,
+        embed_metadata,
+        download_thumbnail,
+        embed_thumbnail,
+        download_subtitles,
+        embed_subtitles,
+        subtitle_languages,
+        auto_subtitles,
+        sponsorblock_enabled,
+        sponsorblock_mode,
+        sponsorblock_categories
       });
 
       // Start enumeration in background and wait for it to complete
