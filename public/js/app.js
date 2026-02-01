@@ -978,7 +978,36 @@ function updateComputedOptions(channelId, channel) {
         flags: mergeArg
       });
       
-      // 3. Metadata toggles (converted to flags by ytdlp-service)
+      // Build list of flags to filter from custom options
+      const flagsToFilter = [];
+      
+      // Filter toggle-based flags (only if toggles are ON)
+      if (downloadMetadata) flagsToFilter.push('--write-info-json');
+      if (embedMetadata) flagsToFilter.push('--embed-metadata');
+      if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
+      if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
+      if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
+      if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
+      if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
+      if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
+      
+      // Filter profile flags (always filter these)
+      if (profile) {
+        if (profile.format_selection) flagsToFilter.push('-f', '--format');
+        if (profile.merge_output_format) flagsToFilter.push('--merge-output-format');
+        
+        // Parse profile additional args and add to filter list
+        if (profile.additional_args) {
+          profile.additional_args.split(/\s+/).forEach(arg => {
+            const flagName = arg.split('=')[0];
+            if (flagName.startsWith('-')) {
+              flagsToFilter.push(flagName);
+            }
+          });
+        }
+      }
+      
+      // 3. Metadata toggles
       const metadataFlags = [];
       if (downloadMetadata) metadataFlags.push('--write-info-json');
       if (embedMetadata) metadataFlags.push('--embed-metadata');
@@ -991,7 +1020,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 4. Thumbnail toggles (converted to flags by ytdlp-service)
+      // 4. Thumbnail toggles
       const thumbnailFlags = [];
       if (downloadThumbnail) thumbnailFlags.push('--write-thumbnail');
       if (embedThumbnail) thumbnailFlags.push('--embed-thumbnail');
@@ -1004,7 +1033,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 5. Subtitle options (in customArgs)
+      // 5. Subtitle options
       const subtitleFlags = [];
       if (downloadSubtitles || embedSubtitles) {
         const langs = subtitleLanguages || 'en';
@@ -1022,7 +1051,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 6. SponsorBlock options (in customArgs)
+      // 6. SponsorBlock options
       if (sponsorblockEnabled) {
         const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
           .map(cb => cb.value).join(',');
@@ -1038,7 +1067,7 @@ function updateComputedOptions(channelId, channel) {
         }
       }
       
-      // 7. Profile additional args (in customArgs)
+      // 7. Profile additional args
       if (profile && profile.additional_args) {
         const profileArgs = profile.additional_args.split(/\s+/);
         allArgs.push(...profileArgs);
@@ -1049,17 +1078,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 8. Filter and add custom options (filtered against toggles only)
-      const flagsToFilter = [];
-      if (downloadMetadata) flagsToFilter.push('--write-info-json');
-      if (embedMetadata) flagsToFilter.push('--embed-metadata');
-      if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
-      if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
-      if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
-      if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
-      if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
-      if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
-      
+      // 8. Filter and add custom options
       const customFiltered = [];
       if (customOptions) {
         customOptions.split(/\s+/).forEach(arg => {
@@ -1078,13 +1097,19 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 9. Add fixed flags that are always present
-      allArgs.push('--no-restrict-filenames');
-      breakdown.push({
-        icon: '🔒',
-        source: 'Always Included',
-        flags: '--no-restrict-filenames'
-      });
+      // 9. Check for filesystem options
+      const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+      const hasFilesystemOption = allArgs.some(arg => filesystemOptions.includes(arg));
+      
+      // Only add --no-restrict-filenames if no other filesystem options present
+      if (!hasFilesystemOption) {
+        allArgs.push('--no-restrict-filenames');
+        breakdown.push({
+          icon: '🔒',
+          source: 'Always Included',
+          flags: '--no-restrict-filenames'
+        });
+      }
       
       return {
         combined: allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)',

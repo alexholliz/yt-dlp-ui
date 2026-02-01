@@ -239,47 +239,50 @@ class DownloadManager {
       profile = this.db.getProfile(channel.profile_id);
     }
 
-    // Build list of flags to filter from custom options (only if corresponding toggle is ON)
+    // Build list of flags to filter from custom options
     const flagsToFilter = [];
     
-    // Only filter metadata flags if toggles are ON
+    // Filter toggle-based flags (only if toggles are ON)
     if (channel.download_metadata) flagsToFilter.push('--write-info-json');
     if (channel.embed_metadata) flagsToFilter.push('--embed-metadata');
-    
-    // Only filter thumbnail flags if toggles are ON
     if (channel.download_thumbnail) flagsToFilter.push('--write-thumbnail');
     if (channel.embed_thumbnail) flagsToFilter.push('--embed-thumbnail');
+    if (channel.download_subtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
+    if (channel.embed_subtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
+    if (channel.auto_subtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
+    if (channel.download_subtitles || channel.embed_subtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
     
-    // Only filter subtitle flags if toggles are ON
-    if (channel.download_subtitles) {
-      flagsToFilter.push('--write-subs', '--write-subtitles');
-    }
-    if (channel.embed_subtitles) {
-      flagsToFilter.push('--embed-subs', '--embed-subtitles');
-    }
-    if (channel.auto_subtitles) {
-      flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
-    }
-    if (channel.download_subtitles || channel.embed_subtitles) {
-      flagsToFilter.push('--sub-lang', '--sub-langs');
+    // Filter profile format/merge flags (always filter these)
+    if (profile) {
+      if (profile.format_selection) flagsToFilter.push('-f', '--format');
+      if (profile.merge_output_format) flagsToFilter.push('--merge-output-format');
+      
+      // Parse profile additional args and add to filter list
+      if (profile.additional_args) {
+        profile.additional_args.split(/\s+/).forEach(arg => {
+          const flagName = arg.split('=')[0];
+          if (flagName.startsWith('-')) {
+            flagsToFilter.push(flagName);
+          }
+        });
+      }
     }
 
-    // Parse and filter custom yt-dlp options to remove conflicts
+    // Parse and filter custom yt-dlp options
     let filteredCustomArgs = '';
     if (channel.yt_dlp_options) {
       const customArgsParsed = channel.yt_dlp_options.split(/\s+/);
       const filtered = customArgsParsed.filter(arg => {
-        // Keep arguments that aren't in our filter list
-        const argWithoutValue = arg.split('=')[0]; // Handle --arg=value format
+        const argWithoutValue = arg.split('=')[0];
         return !flagsToFilter.includes(argWithoutValue);
       });
       filteredCustomArgs = filtered.join(' ');
     }
 
-    // Build enhanced yt-dlp options (only non-boolean flags that need customArgs)
+    // Build enhanced yt-dlp options
     const enhancedArgs = [];
     
-    // Subtitle options (need special formatting)
+    // Subtitle options
     if (channel.download_subtitles || channel.embed_subtitles) {
       const languages = channel.subtitle_languages || 'en';
       enhancedArgs.push(`--sub-langs ${languages}`);
@@ -315,10 +318,17 @@ class DownloadManager {
     }
 
     // Combine all args: enhanced options + SponsorBlock + profile additional + filtered custom args
-    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, profileAdditionalArgs, filteredCustomArgs]
+    const allArgs = [enhancedArgs.join(' '), sponsorblockArgs, profileAdditionalArgs, filteredCustomArgs]
       .filter(Boolean)
       .join(' ')
-      .trim() || null;
+      .trim();
+
+    // Check if any filesystem options are present in the combined args
+    const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+    const hasFilesystemOption = filesystemOptions.some(opt => allArgs.includes(opt));
+    
+    // Only add --no-restrict-filenames if no other filesystem options are present
+    const customArgs = hasFilesystemOption ? allArgs : (allArgs ? `${allArgs} --no-restrict-filenames` : '--no-restrict-filenames');
 
     return {
       outputPath: this.downloadsPath,
@@ -331,9 +341,9 @@ class DownloadManager {
       // Thumbnail options (handled by ytdlp-service)
       writeThumbnail: channel.download_thumbnail,
       embedThumbnail: channel.embed_thumbnail,
-      noRestrictFilenames: true,
+      noRestrictFilenames: !hasFilesystemOption, // Only set if no filesystem options present
       downloadArchive: path.join(this.downloadsPath, '.downloaded'),
-      customArgs,
+      customArgs: customArgs || null,
       playlistMetadata: {
         playlist_title: playlist.playlist_title,
         playlist_id: playlist.playlist_id
