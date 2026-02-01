@@ -598,9 +598,9 @@ async function viewChannel(channelId) {
           </div>
           
           <!-- Detected Overrides/Duplicates -->
-          <div id="conflicts-box-${channelId}" style="display: none; margin: 1rem 0; padding: 0.75rem; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning, #ffc107); border-radius: 4px;">
-            <strong style="display: block; margin-bottom: 0.5rem; color: var(--warning-dark, #856404);">⚠️ Detected Overridden or Duplicate Options:</strong>
-            <div id="conflicts-content-${channelId}" style="font-size: 0.85rem; line-height: 1.6; color: var(--text);">
+          <div id="conflicts-box-${channelId}" style="display: none; margin: 1rem 0; padding: 0.75rem; background: var(--background); border: 1px solid var(--border, #404040); border-radius: 4px;">
+            <strong style="display: block; margin-bottom: 0.5rem; color: var(--warning, #ffc107);">⚠️ Detected Overridden or Duplicate Options:</strong>
+            <div id="conflicts-content-${channelId}" style="font-size: 0.85rem; line-height: 1.6; color: var(--text-muted);">
               Loading...
             </div>
           </div>
