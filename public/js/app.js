@@ -1083,25 +1083,36 @@ function updateComputedOptions(channelId, channel) {
           const arg = customArgsParsed[i];
           const argWithoutValue = arg.split('=')[0];
           
-          // Check if toggle overrides this
-          if (toggleFlags.includes(argWithoutValue)) {
-            // Collect full argument for conflict detection
-            let fullCustomArg = arg;
-            let valueTokens = [];
-            
-            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
-              const nextToken = customArgsParsed[i + 1];
-              if (!nextToken.startsWith('-')) {
-                i++;
-                valueTokens.push(nextToken);
-                if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
-                  while (i + 1 < customArgsParsed.length && !customArgsParsed[i].endsWith('"')) {
-                    i++;
-                    valueTokens.push(customArgsParsed[i]);
-                  }
+          // First, collect full argument (flag + value if present) before any checks
+          let fullCustomArg = arg;
+          let valueTokens = [];
+          let originalI = i;
+          
+          if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
+            const nextToken = customArgsParsed[i + 1];
+            if (!nextToken.startsWith('-')) {
+              valueTokens.push(customArgsParsed[i + 1]);
+              let tempI = i + 1;
+              
+              // If value starts with quote, consume until closing quote
+              if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                while (tempI + 1 < customArgsParsed.length && !customArgsParsed[tempI].endsWith('"')) {
+                  tempI++;
+                  valueTokens.push(customArgsParsed[tempI]);
                 }
+              }
+              
+              if (valueTokens.length > 0) {
                 fullCustomArg = `${arg} ${valueTokens.join(' ')}`;
               }
+            }
+          }
+          
+          // Check if toggle overrides this
+          if (toggleFlags.includes(argWithoutValue)) {
+            // Skip the flag and its value
+            if (valueTokens.length > 0) {
+              i += valueTokens.length;
             }
             
             // Determine which toggle is overriding
