@@ -929,9 +929,19 @@ open http://localhost:8189
 6. **Enhanced yt-dlp Options**
    - Subtitle download and embedding options
    - Thumbnail download and embedding options
+   - Metadata download and embedding options
    - Per-channel configuration
-   - UI checkboxes: "Download Subtitles", "Embed Subtitles"
-   - UI checkboxes: "Download Thumbnails", "Embed Thumbnails"
+   - **Subtitles**:
+     - UI checkbox: "Download Subtitles" → writes .srt/.vtt files alongside video
+     - UI checkbox: "Embed Subtitles" → embeds subtitles in video container
+   - **Thumbnails**:
+     - UI checkbox: "Download Thumbnails" → writes .jpg/.png files alongside video
+     - UI checkbox: "Embed Thumbnails" → embeds thumbnail in video container
+   - **Metadata**:
+     - UI checkbox: "Download Metadata" → writes .info.json file alongside video
+     - UI checkbox: "Embed Metadata" → embeds metadata in video container
+   - All options independent: can select both, either, or neither
+   - Maps to yt-dlp flags: `--write-subs`, `--embed-subs`, `--write-thumbnail`, `--embed-thumbnail`, `--write-info-json`, `--embed-metadata`
 
 7. **SponsorBlock YouTube-Only Detection**
    - SponsorBlock options only shown for YouTube channels
