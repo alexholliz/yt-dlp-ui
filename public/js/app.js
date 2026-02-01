@@ -1076,6 +1076,8 @@ function updateComputedOptions(channelId, channel) {
       // 5. Filter and add custom options (filter by toggles only, track custom flags)
       const customFlags = [];
       const customFiltered = [];
+      const customArgsMap = new Map(); // Map flag -> full argument
+      
       if (customOptions) {
         const customArgsParsed = customOptions.split(/\s+/);
         
@@ -1106,6 +1108,11 @@ function updateComputedOptions(channelId, channel) {
                 fullCustomArg = `${arg} ${valueTokens.join(' ')}`;
               }
             }
+          }
+          
+          // Store in map for later lookup
+          if (argWithoutValue.startsWith('-')) {
+            customArgsMap.set(argWithoutValue, fullCustomArg);
           }
           
           // Check if toggle overrides this
@@ -1248,7 +1255,7 @@ function updateComputedOptions(channelId, channel) {
               }
             } else if (customFlags.includes(argWithoutValue)) {
               // Custom is overriding profile
-              const customArg = customFiltered.find(c => c.split('=')[0] === argWithoutValue) || argWithoutValue;
+              const customArg = customArgsMap.get(argWithoutValue) || argWithoutValue;
               conflicts.push({
                 winnerIcon: '✏️',
                 winnerSource: `${channelName} custom yt-dlp options`,
