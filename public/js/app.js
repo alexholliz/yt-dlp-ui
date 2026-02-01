@@ -932,9 +932,7 @@ async function confirmDeleteChannel() {
 
 function updateComputedOptions(channelId, channel) {
   try {
-    const options = [];
-    
-    // Get current toggle states
+    // Get current field values
     const downloadMetadata = document.getElementById(`edit-download-metadata-${channelId}`)?.checked;
     const embedMetadata = document.getElementById(`edit-embed-metadata-${channelId}`)?.checked;
     const downloadThumbnail = document.getElementById(`edit-download-thumbnail-${channelId}`)?.checked;
@@ -948,70 +946,92 @@ function updateComputedOptions(channelId, channel) {
     const customOptions = document.getElementById(`edit-yt-dlp-options-${channelId}`)?.value.trim();
     const profileId = document.getElementById(`edit-profile-${channelId}`)?.value;
     
-    // Add toggle-based options
-    if (downloadMetadata) options.push('--write-info-json');
-    if (embedMetadata) options.push('--embed-metadata');
-    if (downloadThumbnail) options.push('--write-thumbnail');
-    if (embedThumbnail) options.push('--embed-thumbnail');
-    
-    if (downloadSubtitles || embedSubtitles) {
-      const langs = subtitleLanguages || 'en';
-      options.push(`--sub-langs ${langs}`);
-      if (downloadSubtitles) options.push('--write-subs');
-      if (embedSubtitles) options.push('--embed-subs');
-      if (autoSubtitles) options.push('--write-auto-subs');
-    }
-    
-    // Add SponsorBlock options
-    if (sponsorblockEnabled) {
-      const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
-        .map(cb => cb.value).join(',');
-      if (categories) {
-        const mode = sponsorblockMode || 'mark';
-        options.push(`--sponsorblock-${mode} ${categories}`);
+    const computeFinal = (profileOpts = []) => {
+      const allArgs = [];
+      
+      // 1. Add toggle-based options
+      if (downloadMetadata) allArgs.push('--write-info-json');
+      if (embedMetadata) allArgs.push('--embed-metadata');
+      if (downloadThumbnail) allArgs.push('--write-thumbnail');
+      if (embedThumbnail) allArgs.push('--embed-thumbnail');
+      
+      if (downloadSubtitles || embedSubtitles) {
+        const langs = subtitleLanguages || 'en';
+        allArgs.push(`--sub-langs ${langs}`);
+        if (downloadSubtitles) allArgs.push('--write-subs');
+        if (embedSubtitles) allArgs.push('--embed-subs');
+        if (autoSubtitles) allArgs.push('--write-auto-subs');
       }
-    }
-    
-    // Filter custom options (only filter flags that have corresponding toggles ON)
-    const flagsToFilter = [];
-    if (downloadMetadata) flagsToFilter.push('--write-info-json');
-    if (embedMetadata) flagsToFilter.push('--embed-metadata');
-    if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
-    if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
-    if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
-    if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
-    if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
-    if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
-    
-    if (customOptions) {
-      const customArgsParsed = customOptions.split(/\s+/);
-      const filtered = customArgsParsed.filter(arg => {
-        const argWithoutValue = arg.split('=')[0];
-        return !flagsToFilter.includes(argWithoutValue);
-      });
-      if (filtered.length > 0) {
-        options.push(...filtered);
+      
+      // 2. Add SponsorBlock options
+      if (sponsorblockEnabled) {
+        const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
+          .map(cb => cb.value).join(',');
+        if (categories) {
+          const mode = sponsorblockMode || 'mark';
+          allArgs.push(`--sponsorblock-${mode} ${categories}`);
+        }
       }
-    }
+      
+      // 3. Add profile options (parsed)
+      profileOpts.forEach(opt => allArgs.push(opt));
+      
+      // 4. Filter and add custom options
+      const flagsToFilter = [];
+      if (downloadMetadata) flagsToFilter.push('--write-info-json');
+      if (embedMetadata) flagsToFilter.push('--embed-metadata');
+      if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
+      if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
+      if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
+      if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
+      if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
+      if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
+      
+      if (customOptions) {
+        const customArgsParsed = customOptions.split(/\s+/);
+        customArgsParsed.forEach(arg => {
+          const argWithoutValue = arg.split('=')[0];
+          if (!flagsToFilter.includes(argWithoutValue)) {
+            allArgs.push(arg);
+          }
+        });
+      }
+      
+      // 5. Deduplicate: keep first occurrence of each flag
+      const seen = new Set();
+      const deduplicated = [];
+      
+      for (const arg of allArgs) {
+        const key = arg.split('=')[0].split(' ')[0]; // Get flag without value
+        if (!seen.has(key) && key.startsWith('-')) {
+          seen.add(key);
+          deduplicated.push(arg);
+        } else if (!key.startsWith('-')) {
+          // Not a flag (e.g., value part), keep it
+          deduplicated.push(arg);
+        }
+      }
+      
+      return deduplicated.length > 0 ? deduplicated.join(' ') : '(no additional options)';
+    };
     
-    // Add profile args if selected
+    // Fetch profile if selected, otherwise compute immediately
     if (profileId) {
       api.get(`/api/profiles/${profileId}`).then(profile => {
         const profileOpts = [];
         if (profile.format_selection) profileOpts.push(`-f "${profile.format_selection}"`);
         if (profile.merge_output_format) profileOpts.push(`--merge-output-format ${profile.merge_output_format}`);
-        if (profile.additional_args) profileOpts.push(profile.additional_args);
+        if (profile.additional_args) {
+          // Parse additional args instead of adding as single string
+          profile.additional_args.split(/\s+/).forEach(arg => profileOpts.push(arg));
+        }
         
-        const allOptions = [...options, ...profileOpts];
-        document.getElementById(`computed-options-${channelId}`).textContent = 
-          allOptions.length > 0 ? allOptions.join(' ') : '(no additional options)';
+        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal(profileOpts);
       }).catch(() => {
-        document.getElementById(`computed-options-${channelId}`).textContent = 
-          options.length > 0 ? options.join(' ') : '(no additional options)';
+        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal();
       });
     } else {
-      document.getElementById(`computed-options-${channelId}`).textContent = 
-        options.length > 0 ? options.join(' ') : '(no additional options)';
+      document.getElementById(`computed-options-${channelId}`).textContent = computeFinal();
     }
   } catch (err) {
     console.error('Failed to update computed options:', err);
