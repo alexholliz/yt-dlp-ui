@@ -159,27 +159,84 @@ class YtDlpService {
                   playlist_id: playlistId,
                   playlist_title: entry.title || 'Untitled Playlist',
                   playlist_url: `https://www.youtube.com/playlist?list=${playlistId}`,
-                  video_count: entry.playlist_count || 0
+                  video_count: entry.playlist_count || entry.view_count || 0  // Try multiple fields
                 });
               }
             }
           });
 
-          // Fallback: extract channel name from URL if not found
-          if (!channelInfo.channel_name && cleanUrl.includes('/@')) {
-            const match = cleanUrl.match(/@([^\/]+)/);
-            if (match) {
-              channelInfo.channel_name = match[1];
-            }
-          }
+          // Convert to array and get accurate counts for each playlist
+          const playlists = Array.from(playlistMap.values());
+          
+          // Fetch accurate video counts in parallel (limit to 5 concurrent)
+          const playlistsWithCounts = await Promise.all(
+            playlists.map(async (playlist) => {
+              try {
+                const count = await this.getPlaylistVideoCount(playlist.playlist_url);
+                return { ...playlist, video_count: count };
+              } catch (err) {
+                logger.warn(`Failed to get video count for playlist ${playlist.playlist_id}: ${err.message}`);
+                return playlist; // Keep original (possibly inaccurate) count
+              }
+            })
+          );
 
           resolve({
             ...channelInfo,
-            playlists: Array.from(playlistMap.values()),
+            playlists: playlistsWithCounts,
             method: 'yt-dlp'
           });
         } catch (err) {
           reject(new Error(`Failed to parse yt-dlp output: ${err.message}`));
+        }
+      });
+    });
+  }
+
+  async getPlaylistVideoCount(playlistUrl) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--dump-json',
+        '--flat-playlist',
+        '--skip-download',
+        '--playlist-end', '1'  // Only get first video to extract playlist metadata
+      ];
+
+      if (fs.existsSync(this.cookiesPath)) {
+        args.push('--cookies', this.cookiesPath);
+      }
+
+      args.push(playlistUrl);
+
+      const ytdlp = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      ytdlp.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      ytdlp.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytdlp.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(`yt-dlp failed: ${stderr}`));
+        }
+
+        try {
+          const lines = stdout.trim().split('\n').filter(line => line);
+          if (lines.length === 0) {
+            return resolve(0);
+          }
+
+          const firstEntry = JSON.parse(lines[0]);
+          // The playlist_count field contains the total video count
+          const count = firstEntry.playlist_count || firstEntry.n_entries || 0;
+          resolve(count);
+        } catch (err) {
+          reject(new Error(`Failed to parse playlist info: ${err.message}`));
         }
       });
     });
