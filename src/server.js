@@ -225,8 +225,12 @@ db.ready.then(() => {
   app.put('/api/channels/:id', (req, res) => {
     try {
       logger.debug(`PUT /api/channels/${req.params.id} - Body:`, JSON.stringify(req.body));
-      const { playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, profile_id, enabled } = req.body;
-      logger.debug(`Extracted enabled value: ${enabled} (type: ${typeof enabled})`);
+      const { 
+        playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, profile_id, enabled,
+        download_metadata, embed_metadata, download_thumbnail, embed_thumbnail,
+        download_subtitles, embed_subtitles, subtitle_languages, auto_subtitles,
+        sponsorblock_enabled, sponsorblock_mode, sponsorblock_categories
+      } = req.body;
       
       const updateData = {
         playlist_mode,
@@ -234,7 +238,18 @@ db.ready.then(() => {
         auto_add_new_playlists,
         yt_dlp_options,
         profile_id,
-        enabled
+        enabled,
+        download_metadata,
+        embed_metadata,
+        download_thumbnail,
+        embed_thumbnail,
+        download_subtitles,
+        embed_subtitles,
+        subtitle_languages,
+        auto_subtitles,
+        sponsorblock_enabled,
+        sponsorblock_mode,
+        sponsorblock_categories
       };
       logger.debug(`Update data being passed to DB:`, JSON.stringify(updateData));
       
@@ -243,7 +258,7 @@ db.ready.then(() => {
       // Verify the update
       const channels = db.getAllChannels();
       const updatedChannel = channels.find(c => c.id === parseInt(req.params.id));
-      logger.debug(`After update, channel ${req.params.id} enabled = ${updatedChannel?.enabled}`);
+      logger.debug(`After update, channel ${req.params.id} settings:`, JSON.stringify(updatedChannel));
       
       res.json({ success: true });
     } catch (err) {
