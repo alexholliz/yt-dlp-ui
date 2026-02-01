@@ -886,93 +886,228 @@ open http://localhost:8189
 
 ### Planned Features (Not Yet Implemented)
 
-1. **Profile Integration with Downloads** (IN PROGRESS)
+#### 🔄 In Progress
+
+1. **Profile Integration with Downloads**
    - Use profile settings in download-manager.js
    - Apply output template from profile
    - Apply format selection from profile
    - Test end-to-end with channel downloads
 
-2. **YouTube Authentication & Cookie Management**
+#### 🚀 High Priority Features
+
+2. **YouTube Authentication & Cookie Management** (Enhanced)
    - Cookie generation with YouTube login or API integration
    - Handles age-restricted and members-only content
    - Automatic cookie refresh/renewal
    - Cookie validation and expiry warnings
    - Solves "Sign in to confirm you're not a bot" issues
+   - **NEW**: Cookies only applied to YouTube channels/videos (not other sites)
 
-3. **Channel Non-Playlist Video Downloads**
-   - New mode for channels to download videos not in any playlist
-   - "All Videos" tab/mode alongside playlists
-   - Handles shorts, community posts, live streams
-   - Optional: separate enable/disable toggle from playlists
+3. **Plex Media Server Integration**
+   - Add Plex connection settings to Config page
+   - Configure Plex server URL and authentication token
+   - Trigger library refresh after playlist/queue completion
+   - Only trigger on full operations (not per-video)
+   - Optional: specify which Plex library to refresh
 
-4. **Multi-Site Support (Beyond YouTube)**
-   - Support for non-YouTube sites (leveraging yt-dlp's 1000+ extractors)
-   - Site-specific configuration profiles
-   - URL validation for supported sites
-   - Custom metadata extraction per site
-   - Examples: Vimeo, Twitch, Twitter/X, Instagram, etc.
+4. **Existing Content Import/Sync**
+   - Scan downloads folder for existing content
+   - Parse folder structures to identify channels and playlists
+   - Auto-create channel and playlist entries in database
+   - Match existing files to video IDs
+   - Update download archive to prevent re-downloads
+   - Handle partial imports gracefully
 
-5. **Additional Profile Presets**
-   - "720p Space Saver" preset
-   - "Max Quality" preset
-   - "Audio Only" preset
+5. **YouTube Shorts & Livestream Filtering**
+   - Add channel options to include/exclude shorts
+   - Add channel options to include/exclude livestreams
+   - **Default**: Exclude both shorts and livestreams
+   - Use yt-dlp filters: `--match-filter "!is_live & duration > 60"`
+   - Configurable per-channel
 
-6. **Video Thumbnails**
-   - Display in history table
-   - Show in video metadata modal  
-   - Lazy load for performance
+6. **Enhanced yt-dlp Options**
+   - Subtitle download and embedding options
+   - Thumbnail download and embedding options
+   - Per-channel configuration
+   - UI checkboxes: "Download Subtitles", "Embed Subtitles"
+   - UI checkboxes: "Download Thumbnails", "Embed Thumbnails"
 
-7. **Advanced Filtering**
-   - Filter videos by channel, playlist, or status
-   - Search videos by title
-   - Date range filtering
+7. **SponsorBlock YouTube-Only Detection**
+   - SponsorBlock options only shown for YouTube channels
+   - Grey out/disable for non-YouTube content
+   - Display message: "SponsorBlock only supported for YouTube content"
+   - Detect YouTube URLs vs other sites
 
-8. **Batch Channel Management**
-   - Import channels from text file
-   - Export channel list
-   - Bulk enable/disable channels
+#### 🎨 UI/UX Improvements
 
-9. **Download Statistics**
-   - Charts for download history
-   - Bandwidth usage tracking
-   - Success/failure rates
+8. **Browser Refresh State Preservation**
+   - Save current page/view in localStorage or URL
+   - Restore user to same page after browser refresh
+   - Currently always returns to home page
+   - Improves user experience during active session
 
-10. **Mobile Responsive UI**
+9. **YouTube API Quota Tracker Improvements**
+   - Only display quota tracker when API key is configured
+   - Check for API key in config OR local file
+   - Hide quota UI when no API key present
+   - **Test**: Verify API query tracking actually works
+
+10. **Pipeline Readability in GitHub Actions**
+    - Break out test steps into individual named steps
+    - Show clear step names in Actions UI instead of blob
+    - Easier to identify which specific test failed
+    - Better progress visibility
+
+#### 🏗️ DevOps & Infrastructure
+
+11. **Stable & Dev Branch Strategy**
+    - **Dev branch** (currently main): Latest development work
+    - **Stable branch**: Latest release version
+    - Container tags: `latest` (dev), `stable`, `v1.x.x`
+    - Branch protection: Dev branch requires PRs from contributors
+    - Admin can bypass PR requirement on dev branch
+    - Releases tagged and pushed to stable branch
+
+12. **Test Pipeline Separation**
+    - **Dev pipeline**: Fast unit tests only (35 tests)
+    - **Stable pipeline**: Full test suite including integration
+    - Full suite includes real SponsorBlock video test
+    - Full suite requires YouTube credentials/cookies/API key
+    - Pass credentials securely via GitHub Secrets
+
+13. **Documentation File Management**
+    - Mark planning .MD files as repo-owner only
+    - Use `.git/info/exclude` or `.gitignore` with force-add
+    - Files sync to repo but hidden from forks/clones
+    - Keeps project state visible to AI across machines
+    - **Question**: Best approach for this use case?
+
+14. **AI Agent Instructions File**
+    - Create `.copilot-instructions.md` or similar
+    - Read automatically by AI agents for every query
+    - Contains: query handling structure, assumptions, conventions
+    - Similar to PROJECT_STATE.md but specifically for AI behavior
+    - **Question**: What's the best practice for this?
+
+#### 🔒 Security & Infrastructure
+
+15. **Reverse Proxy HTTPS Support**
+    - Verify basic auth works behind reverse proxy
+    - Ensure auth headers preserved through proxy
+    - Document nginx/Traefik/Caddy configuration
+    - **Question**: Is basic auth password securely stored?
+    - **Question**: Any security considerations for HTTPS termination?
+
+#### 📦 Content Management
+
+16. **Channel Non-Playlist Video Downloads**
+    - New mode for channels to download videos not in any playlist
+    - "All Videos" tab/mode alongside playlists
+    - Handles shorts, community posts, live streams
+    - Optional: separate enable/disable toggle from playlists
+
+17. **Multi-Site Support (Beyond YouTube)**
+    - Support for non-YouTube sites (leveraging yt-dlp's 1000+ extractors)
+    - Site-specific configuration profiles
+    - URL validation for supported sites
+    - Custom metadata extraction per site
+    - Examples: Vimeo, Twitch, Twitter/X, Instagram, etc.
+    - **YouTube-specific features** only apply to YouTube content
+
+#### 🎯 Nice-to-Have Features
+
+18. **Additional Profile Presets**
+    - "720p Space Saver" preset
+    - "Max Quality" preset
+    - "Audio Only" preset
+
+19. **Video Thumbnails**
+    - Display in history table
+    - Show in video metadata modal  
+    - Lazy load for performance
+
+20. **Advanced Filtering**
+    - Filter videos by channel, playlist, or status
+    - Search videos by title
+    - Date range filtering
+
+21. **Batch Channel Management**
+    - Import channels from text file
+    - Export channel list
+    - Bulk enable/disable channels
+
+22. **Download Statistics**
+    - Charts for download history
+    - Bandwidth usage tracking
+    - Success/failure rates
+
+23. **Mobile Responsive UI**
     - Optimize sidebar for mobile
     - Touch-friendly controls
     - Responsive tables
 
-11. **Search & Filtering**
-    - Search videos by title
-    - Filter by channel
-    - Date range filters
-
-12. **Notifications**
+24. **Notifications**
     - Discord webhook
     - Telegram bot
     - Email alerts
     - Download completion notifications
 
-13. **Advanced Scheduling**
-   - Per-channel schedules
-   - Time-of-day preferences
-   - Bandwidth limiting
+25. **Advanced Scheduling**
+    - Per-channel schedules
+    - Time-of-day preferences
+    - Bandwidth limiting
 
-8. **Statistics Dashboard**
-   - Charts and graphs
-   - Download trends
-   - Popular playlists
-   - Storage usage over time
+26. **Statistics Dashboard**
+    - Charts and graphs
+    - Download trends
+    - Popular playlists
+    - Storage usage over time
 
-9. **Export/Import**
-   - Backup configuration
-   - Import from Pinchflat
-   - Export channel list
+27. **Export/Import**
+    - Backup configuration
+    - Import from Pinchflat
+    - Export channel list
 
-10. **Mobile Responsive Improvements**
-    - Better mobile nav
-    - Touch-friendly controls
-    - Responsive tables
+### Questions to Resolve
+
+These items need research or decisions before implementation:
+
+1. **Documentation File Visibility** (Item 13)
+   - **Question**: How to keep .MD planning files in repo but hidden from forks?
+   - **Options**: 
+     - Use `.git/info/exclude` (local only, doesn't sync)
+     - Use `.gitignore` with `git add -f` (still visible in forks)
+     - Keep files public (current approach)
+     - Use private repo for planning, public for code
+   - **Recommendation needed**
+
+2. **AI Agent Instructions File** (Item 14)
+   - **Question**: Standard format for AI assistant instructions?
+   - **Options**:
+     - `.copilot-instructions.md` in repo root
+     - Expand PROJECT_STATE.md instructions section
+     - Use GitHub Copilot workspace instructions (if available)
+   - **Current**: PROJECT_STATE.md has comprehensive AI instructions
+
+3. **Reverse Proxy Security** (Item 15)
+   - **Question**: Is basic auth secure behind reverse proxy with HTTPS termination?
+   - **Answer needed**: Password storage security
+   - **Answer needed**: Headers preserved through nginx/Traefik/Caddy
+   - **Action**: Test and document reverse proxy configurations
+
+4. **API Query Tracking** (Item 9)
+   - **Question**: Does YouTube API quota tracking actually work?
+   - **Action**: Needs testing and verification
+   - **Status**: Implemented but unverified
+
+5. **Full Test Suite Authentication** (Item 12)
+   - **Question**: Best way to pass YouTube credentials to tests?
+   - **Options**:
+     - GitHub Secrets for cookies file
+     - GitHub Secrets for YouTube credentials
+     - YouTube API key only (may not work for all tests)
+   - **Security**: Must not expose credentials in logs
 
 ### Known Bugs to Fix
 
