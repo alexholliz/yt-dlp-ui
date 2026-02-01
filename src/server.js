@@ -285,11 +285,39 @@ db.ready.then(() => {
   });
 
   // Delete channel
-  app.delete('/api/channels/:id', (req, res) => {
+  app.delete('/api/channels/:id', async (req, res) => {
     try {
-      db.deleteChannel(req.params.id);
-      res.json({ success: true });
+      const channelId = req.params.id;
+      const deleteFiles = req.query.deleteFiles === 'true';
+      
+      if (deleteFiles) {
+        // Get channel info and all videos before deleting from DB
+        const channel = db.getChannel(channelId);
+        const videos = db.getVideosByChannel(channelId);
+        
+        if (channel && videos.length > 0) {
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Delete channel folder
+          const channelFolderPattern = channel.channel_name 
+            ? `${channel.channel_name} [${channel.channel_id}]`
+            : null;
+          
+          if (channelFolderPattern) {
+            const channelPath = path.join(downloadsPath, channelFolderPattern);
+            if (fs.existsSync(channelPath)) {
+              fs.rmSync(channelPath, { recursive: true, force: true });
+              logger.info(`Deleted channel folder: ${channelPath}`);
+            }
+          }
+        }
+      }
+      
+      db.deleteChannel(channelId);
+      res.json({ success: true, deletedFiles: deleteFiles });
     } catch (err) {
+      logger.error(`Failed to delete channel ${req.params.id}:`, err);
       res.status(500).json({ error: err.message });
     }
   });
