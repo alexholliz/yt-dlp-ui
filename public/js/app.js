@@ -427,9 +427,9 @@ async function viewChannel(channelId) {
           <div class="form-group">
             <label for="edit-profile-${channelId}">yt-dlp Profile</label>
             <select id="edit-profile-${channelId}">
-              <option value="">None (use custom options below)</option>
+              <option value="">None (uses custom options below)</option>
             </select>
-            <small>Select a profile or leave as None to use custom options</small>
+            <small>Select a profile or leave as None to use custom yt-dlp options in the Advanced section below</small>
           </div>
           <div class="form-group">
             <label>
