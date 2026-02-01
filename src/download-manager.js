@@ -233,6 +233,34 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
+    // Build list of flags to filter from custom options (controlled by toggles)
+    const toggleControlledFlags = [
+      '--write-info-json',
+      '--embed-metadata',
+      '--write-thumbnail',
+      '--embed-thumbnail',
+      '--write-subs',
+      '--write-subtitles',
+      '--embed-subs',
+      '--embed-subtitles',
+      '--write-auto-subs',
+      '--write-automatic-subs',
+      '--sub-lang',
+      '--sub-langs'
+    ];
+
+    // Parse and filter custom yt-dlp options to remove conflicts
+    let filteredCustomArgs = '';
+    if (channel.yt_dlp_options) {
+      const customArgsParsed = channel.yt_dlp_options.split(/\s+/);
+      const filtered = customArgsParsed.filter(arg => {
+        // Keep arguments that aren't in our toggle-controlled list
+        const argWithoutValue = arg.split('=')[0]; // Handle --arg=value format
+        return !toggleControlledFlags.includes(argWithoutValue);
+      });
+      filteredCustomArgs = filtered.join(' ');
+    }
+
     // Build enhanced yt-dlp options (only non-boolean flags that need customArgs)
     const enhancedArgs = [];
     
@@ -265,8 +293,8 @@ class DownloadManager {
       }
     }
 
-    // Combine all args: enhanced options + SponsorBlock + custom args
-    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, channel.yt_dlp_options]
+    // Combine all args: enhanced options + SponsorBlock + filtered custom args
+    const customArgs = [enhancedArgs.join(' '), sponsorblockArgs, filteredCustomArgs]
       .filter(Boolean)
       .join(' ')
       .trim() || null;
