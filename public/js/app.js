@@ -964,6 +964,7 @@ function updateComputedOptions(channelId, channel) {
     
     const computeFinal = (profile = null) => {
       const profileName = profile?.name || 'Profile';
+      const channelName = channel?.channel_name || 'Channel';
       const allArgs = [];
       const breakdown = [];
       const conflicts = [];
@@ -1140,7 +1141,7 @@ function updateComputedOptions(channelId, channel) {
                 winnerSource: overrideSource,
                 winnerFlag: overrideFlag,
                 loserIcon: '✏️',
-                loserSource: 'Channel custom yt-dlp Options',
+                loserSource: `${channelName} custom yt-dlp options`,
                 loserFlag: fullCustomArg
               });
             }
@@ -1239,7 +1240,7 @@ function updateComputedOptions(channelId, channel) {
               const customArg = customFiltered.find(c => c.split('=')[0] === argWithoutValue) || argWithoutValue;
               conflicts.push({
                 winnerIcon: '✏️',
-                winnerSource: 'Channel custom yt-dlp Options',
+                winnerSource: `${channelName} custom yt-dlp options`,
                 winnerFlag: customArg,
                 loserIcon: '🎯',
                 loserSource: `${profileName} custom yt-dlp options`,
