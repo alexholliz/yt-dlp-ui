@@ -281,12 +281,19 @@ class DownloadManager {
         // Check if this flag should be filtered
         if (flagsToFilter.includes(argWithoutValue)) {
           // Skip this flag
-          // Also skip next token if this flag takes a value (doesn't use = syntax)
+          // Also skip the value if this flag takes a value
           if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
             const nextToken = customArgsParsed[i + 1];
             // Skip next token if it's not a flag (it's the value)
             if (!nextToken.startsWith('-')) {
               i++; // Skip the value token
+              
+              // If value starts with quote, consume until closing quote
+              if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                while (i + 1 < customArgsParsed.length && !customArgsParsed[i].endsWith('"')) {
+                  i++;
+                }
+              }
             }
           }
         } else {
