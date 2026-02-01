@@ -224,13 +224,14 @@ db.ready.then(() => {
   // Update channel
   app.put('/api/channels/:id', (req, res) => {
     try {
-      const { playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, profile_id } = req.body;
+      const { playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, profile_id, enabled } = req.body;
       db.updateChannel(req.params.id, {
         playlist_mode,
         flat_mode,
         auto_add_new_playlists,
         yt_dlp_options,
-        profile_id
+        profile_id,
+        enabled
       });
       res.json({ success: true });
     } catch (err) {

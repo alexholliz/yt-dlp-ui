@@ -198,6 +198,11 @@ class DB {
         this.save();
         console.log('Migration: Added sponsorblock_categories column to channels table');
       }
+      if (!columns.includes('enabled')) {
+        this.db.run("ALTER TABLE channels ADD COLUMN enabled BOOLEAN DEFAULT 1");
+        this.save();
+        console.log('Migration: Added enabled column to channels table');
+      }
     } catch (err) {
       console.warn('Migration check for SponsorBlock failed:', err.message);
     }
@@ -342,6 +347,10 @@ class DB {
     if (data.sponsorblock_categories !== undefined) {
       fields.push('sponsorblock_categories = ?');
       values.push(data.sponsorblock_categories);
+    }
+    if (data.enabled !== undefined) {
+      fields.push('enabled = ?');
+      values.push(data.enabled ? 1 : 0);
     }
 
     fields.push('updated_at = strftime("%s", "now")');

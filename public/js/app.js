@@ -290,7 +290,7 @@ async function loadChannelsPage() {
           <td>${formatDateTime(c.last_scraped_at)}</td>
           <td>
             <label class="toggle-switch">
-              <input type="checkbox" checked onchange="toggleChannel(${c.id}, this.checked)">
+              <input type="checkbox" ${c.enabled !== 0 ? 'checked' : ''} onchange="toggleChannel(${c.id}, this.checked)">
               <span class="toggle-slider"></span>
             </label>
           </td>
@@ -690,7 +690,15 @@ async function togglePlaylist(playlistId, enabled) {
 }
 
 async function toggleChannel(channelId, enabled) {
-  showNotification(`Channel ${enabled ? 'enabled' : 'disabled'} for automation`, 'info');
+  try {
+    await api.put(`/api/channels/${channelId}`, { enabled });
+    showNotification(`Channel ${enabled ? 'enabled' : 'disabled'} for automation`, 'success');
+  } catch (err) {
+    showNotification(`Failed to toggle channel: ${err.message}`, 'error');
+    // Revert the toggle on error
+    const checkbox = document.querySelector(`input[onchange*="toggleChannel(${channelId}"]`);
+    if (checkbox) checkbox.checked = !enabled;
+  }
 }
 
 async function downloadChannel(channelId) {
