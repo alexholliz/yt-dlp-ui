@@ -36,7 +36,8 @@ CMD ["npm", "test"]
 FROM base AS production
 
 # Install only production dependencies
-RUN npm ci --only=production
+# Using --omit=dev (modern npm syntax, replaces --only=production)
+RUN npm ci --omit=dev
 
 # Copy application files
 COPY src/ ./src/

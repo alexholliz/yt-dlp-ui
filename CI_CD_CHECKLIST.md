@@ -77,39 +77,29 @@ After you push the pipeline to GitHub, complete these steps:
 
 ## Known Issues & Workarounds
 
-### ARM64 Build Disabled (2026-01-31)
+### ARM64 Build Issue - Resolved (2026-02-01)
 
-**Issue**: Multi-architecture builds fail on ARM64 with QEMU emulation error:
-```
-qemu: uncaught target signal 4 (Illegal instruction) - core dumped
-```
+**Issue**: Multi-architecture builds were failing on ARM64 with QEMU emulation error after adding test dependencies.
 
-**Root Cause**: Node.js Alpine images have known incompatibilities with QEMU emulation used by Docker Buildx for cross-platform builds.
+**Root Cause**: `jsdom` package (a devDependency) has native bindings that fail under QEMU emulation used by Docker Buildx for cross-platform builds.
 
-**Current Solution**: Build AMD64 only (covers 95%+ of users)
-- Modified `.github/workflows/build-and-test.yml` line 84
-- Changed from: `platforms: linux/amd64,linux/arm64`
-- Changed to: `platforms: linux/amd64`
+**Solution**: Removed jsdom from devDependencies since it wasn't being used yet
+- jsdom was added for future UI JavaScript tests but never actually used
+- supertest (the other test dependency) has no native bindings and works fine
+- Removed jsdom, regenerated package-lock.json
+- Re-enabled ARM64 builds: `platforms: linux/amd64,linux/arm64`
 
-**Future Options**:
-1. **Switch to Debian-based Node image** (e.g., `node:20-slim`)
-   - Pros: Better QEMU compatibility
-   - Cons: Larger image size (~150MB vs ~50MB)
-   
-2. **Use native ARM64 runners** (GitHub hosted or self-hosted)
-   - Pros: No QEMU emulation issues
-   - Cons: Costs money, more complex setup
-   
-3. **Use Docker buildx with --provenance=false**
-   - Sometimes helps with QEMU issues
-   - May not fully resolve the problem
-   
-4. **Keep ARM64 disabled**
-   - Most users are on AMD64 (x86_64)
-   - ARM64 users can build locally if needed
+**Lesson Learned**: 
+- Heavy dependencies with native bindings (like jsdom, puppeteer, sharp) can cause QEMU issues
+- Only add dependencies when actually needed
+- Test multi-arch builds after adding new dependencies
+- Production builds were unaffected (only dev dependencies had the issue)
 
-**Affected Users**: Raspberry Pi, Apple Silicon (M1/M2/M3), ARM-based servers
-**Workaround for ARM64 users**: Build locally with `docker-compose build`
+**If Future UI Tests Need jsdom**:
+1. Try alternatives first: happy-dom (lighter, no native deps)
+2. If jsdom is required, consider debian-based Node image
+3. Or use native ARM64 runners (GitHub hosted or self-hosted)
+4. Or test UI functionality through API tests instead
 
 ---
 
