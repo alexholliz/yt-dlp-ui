@@ -224,17 +224,27 @@ db.ready.then(() => {
   // Update channel
   app.put('/api/channels/:id', (req, res) => {
     try {
-      logger.debug(`Updating channel ${req.params.id} with:`, req.body);
+      logger.debug(`PUT /api/channels/${req.params.id} - Body:`, JSON.stringify(req.body));
       const { playlist_mode, flat_mode, auto_add_new_playlists, yt_dlp_options, profile_id, enabled } = req.body;
-      db.updateChannel(req.params.id, {
+      logger.debug(`Extracted enabled value: ${enabled} (type: ${typeof enabled})`);
+      
+      const updateData = {
         playlist_mode,
         flat_mode,
         auto_add_new_playlists,
         yt_dlp_options,
         profile_id,
         enabled
-      });
-      logger.debug(`Channel ${req.params.id} updated successfully`);
+      };
+      logger.debug(`Update data being passed to DB:`, JSON.stringify(updateData));
+      
+      db.updateChannel(req.params.id, updateData);
+      
+      // Verify the update
+      const channels = db.getAllChannels();
+      const updatedChannel = channels.find(c => c.id === parseInt(req.params.id));
+      logger.debug(`After update, channel ${req.params.id} enabled = ${updatedChannel?.enabled}`);
+      
       res.json({ success: true });
     } catch (err) {
       logger.error(`Failed to update channel ${req.params.id}:`, err);
