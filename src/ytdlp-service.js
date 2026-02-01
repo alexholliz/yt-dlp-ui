@@ -400,6 +400,10 @@ class YtDlpService {
       if (options.writeInfoJson) {
         args.push('--write-info-json');
       }
+      
+      if (options.embedMetadata) {
+        args.push('--embed-metadata');
+      }
 
       if (options.noRestrictFilenames) {
         args.push('--no-restrict-filenames');
@@ -407,6 +411,10 @@ class YtDlpService {
 
       if (options.writeThumbnail) {
         args.push('--write-thumbnail');
+      }
+      
+      if (options.embedThumbnail) {
+        args.push('--embed-thumbnail');
       }
 
       // If playlist item index is specified, only download that specific item

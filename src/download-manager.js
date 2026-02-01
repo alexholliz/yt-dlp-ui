@@ -233,26 +233,10 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
-    // Build enhanced yt-dlp options
+    // Build enhanced yt-dlp options (only non-boolean flags that need customArgs)
     const enhancedArgs = [];
     
-    // Metadata options
-    if (channel.download_metadata) {
-      enhancedArgs.push('--write-info-json');
-    }
-    if (channel.embed_metadata) {
-      enhancedArgs.push('--embed-metadata');
-    }
-    
-    // Thumbnail options
-    if (channel.download_thumbnail) {
-      enhancedArgs.push('--write-thumbnail');
-    }
-    if (channel.embed_thumbnail) {
-      enhancedArgs.push('--embed-thumbnail');
-    }
-    
-    // Subtitle options
+    // Subtitle options (need special formatting)
     if (channel.download_subtitles || channel.embed_subtitles) {
       const languages = channel.subtitle_languages || 'en';
       enhancedArgs.push(`--sub-langs ${languages}`);
@@ -292,9 +276,13 @@ class DownloadManager {
       outputTemplate,
       format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
       mergeOutputFormat: 'mp4',
-      writeInfoJson: channel.embed_metadata || channel.download_metadata, // Keep for backwards compat
+      // Metadata options (handled by ytdlp-service)
+      writeInfoJson: channel.download_metadata,
+      embedMetadata: channel.embed_metadata,
+      // Thumbnail options (handled by ytdlp-service)
+      writeThumbnail: channel.download_thumbnail,
+      embedThumbnail: channel.embed_thumbnail,
       noRestrictFilenames: true,
-      writeThumbnail: channel.embed_thumbnail || channel.download_thumbnail, // Keep for backwards compat
       downloadArchive: path.join(this.downloadsPath, '.downloaded'),
       customArgs,
       playlistMetadata: {
