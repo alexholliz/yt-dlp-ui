@@ -233,30 +233,39 @@ class DownloadManager {
       ? '%(uploader)s [%(channel_id)s]/%(title)s [%(id)s].%(ext)s'
       : '%(uploader)s [%(channel_id)s]/%(playlist_title)s [%(playlist_id)s]/%(playlist_index)s - %(title)s [%(id)s].%(ext)s';
 
-    // Build list of flags to filter from custom options (controlled by toggles)
-    const toggleControlledFlags = [
-      '--write-info-json',
-      '--embed-metadata',
-      '--write-thumbnail',
-      '--embed-thumbnail',
-      '--write-subs',
-      '--write-subtitles',
-      '--embed-subs',
-      '--embed-subtitles',
-      '--write-auto-subs',
-      '--write-automatic-subs',
-      '--sub-lang',
-      '--sub-langs'
-    ];
+    // Build list of flags to filter from custom options (only if corresponding toggle is ON)
+    const flagsToFilter = [];
+    
+    // Only filter metadata flags if toggles are ON
+    if (channel.download_metadata) flagsToFilter.push('--write-info-json');
+    if (channel.embed_metadata) flagsToFilter.push('--embed-metadata');
+    
+    // Only filter thumbnail flags if toggles are ON
+    if (channel.download_thumbnail) flagsToFilter.push('--write-thumbnail');
+    if (channel.embed_thumbnail) flagsToFilter.push('--embed-thumbnail');
+    
+    // Only filter subtitle flags if toggles are ON
+    if (channel.download_subtitles) {
+      flagsToFilter.push('--write-subs', '--write-subtitles');
+    }
+    if (channel.embed_subtitles) {
+      flagsToFilter.push('--embed-subs', '--embed-subtitles');
+    }
+    if (channel.auto_subtitles) {
+      flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
+    }
+    if (channel.download_subtitles || channel.embed_subtitles) {
+      flagsToFilter.push('--sub-lang', '--sub-langs');
+    }
 
     // Parse and filter custom yt-dlp options to remove conflicts
     let filteredCustomArgs = '';
     if (channel.yt_dlp_options) {
       const customArgsParsed = channel.yt_dlp_options.split(/\s+/);
       const filtered = customArgsParsed.filter(arg => {
-        // Keep arguments that aren't in our toggle-controlled list
+        // Keep arguments that aren't in our filter list
         const argWithoutValue = arg.split('=')[0]; // Handle --arg=value format
-        return !toggleControlledFlags.includes(argWithoutValue);
+        return !flagsToFilter.includes(argWithoutValue);
       });
       filteredCustomArgs = filtered.join(' ');
     }
