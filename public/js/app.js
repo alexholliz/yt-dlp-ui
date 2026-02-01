@@ -1159,7 +1159,7 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 6. Filter and add profile additional args (filter by toggles AND custom)
+      // 6. Filter and add profile additional args (filter by toggles AND custom, track conflicts)
       const profileFiltered = [];
       if (profile && profile.additional_args) {
         const profileArgsParsed = profile.additional_args.split(/\s+/);
@@ -1170,17 +1170,74 @@ function updateComputedOptions(channelId, channel) {
           const argWithoutValue = arg.split('=')[0];
           
           if (filterList.includes(argWithoutValue)) {
-            // Skip this flag and its value
+            // Collect full profile argument for conflict detection
+            let fullProfileArg = arg;
+            let valueTokens = [];
+            
             if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
               const nextToken = profileArgsParsed[i + 1];
               if (!nextToken.startsWith('-')) {
                 i++;
+                valueTokens.push(nextToken);
                 if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
                   while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
                     i++;
+                    valueTokens.push(profileArgsParsed[i]);
                   }
                 }
+                fullProfileArg = `${arg} ${valueTokens.join(' ')}`;
               }
+            }
+            
+            // Determine what's overriding this profile option
+            if (toggleFlags.includes(argWithoutValue)) {
+              // Toggle is overriding profile
+              let overrideSource = '';
+              let overrideFlag = argWithoutValue;
+              
+              if (downloadMetadata && argWithoutValue === '--write-info-json') {
+                overrideSource = 'Metadata Toggle (download)';
+                overrideFlag = '--write-info-json';
+              } else if (embedMetadata && argWithoutValue === '--embed-metadata') {
+                overrideSource = 'Metadata Toggle (embed)';
+                overrideFlag = '--embed-metadata';
+              } else if (downloadThumbnail && argWithoutValue === '--write-thumbnail') {
+                overrideSource = 'Thumbnail Toggle (download)';
+                overrideFlag = '--write-thumbnail';
+              } else if (embedThumbnail && argWithoutValue === '--embed-thumbnail') {
+                overrideSource = 'Thumbnail Toggle (embed)';
+                overrideFlag = '--embed-thumbnail';
+              } else if ((downloadSubtitles || embedSubtitles) && (argWithoutValue === '--sub-lang' || argWithoutValue === '--sub-langs')) {
+                overrideSource = 'Subtitle Toggle (language)';
+                overrideFlag = `--sub-langs ${subtitleLanguages || 'en'}`;
+              } else if (downloadSubtitles && (argWithoutValue === '--write-subs' || argWithoutValue === '--write-subtitles')) {
+                overrideSource = 'Subtitle Toggle (download)';
+                overrideFlag = '--write-subs';
+              } else if (embedSubtitles && (argWithoutValue === '--embed-subs' || argWithoutValue === '--embed-subtitles')) {
+                overrideSource = 'Subtitle Toggle (embed)';
+                overrideFlag = '--embed-subs';
+              } else if (autoSubtitles && (argWithoutValue === '--write-auto-subs' || argWithoutValue === '--write-automatic-subs')) {
+                overrideSource = 'Subtitle Toggle (auto)';
+                overrideFlag = '--write-auto-subs';
+              }
+              
+              if (overrideSource) {
+                conflicts.push({
+                  customFlag: `🎯 ${fullProfileArg}`,
+                  overrideIcon: '🎚️',
+                  overrideSource,
+                  overrideFlag
+                });
+              }
+            } else if (customFlags.includes(argWithoutValue)) {
+              // Custom is overriding profile
+              const customArg = customFiltered.find(c => c.split('=')[0] === argWithoutValue) || argWithoutValue;
+              conflicts.push({
+                customFlag: `🎯 Profile: ${fullProfileArg}`,
+                overrideIcon: '✏️',
+                overrideSource: 'Custom yt-dlp Options',
+                overrideFlag: customArg
+              });
             }
           } else {
             profileFiltered.push(arg);
