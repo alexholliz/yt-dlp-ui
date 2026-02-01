@@ -54,10 +54,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupNavigation() {
+  // Restore last viewed page from localStorage
+  const savedPage = localStorage.getItem('currentPage') || 'home';
+  
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', (e) => {
       e.preventDefault();
       const page = item.dataset.page;
+      
+      // Save current page to localStorage
+      localStorage.setItem('currentPage', page);
+      
       document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       item.classList.add('active');
@@ -69,6 +76,12 @@ function setupNavigation() {
       if (page === 'config') loadConfigPage();
     });
   });
+  
+  // Restore saved page on load
+  const savedPageElement = document.querySelector(`.nav-item[data-page="${savedPage}"]`);
+  if (savedPageElement) {
+    savedPageElement.click();
+  }
 }
 
 function setupEventListeners() {
@@ -318,6 +331,49 @@ async function loadProfilesPage() {
 function loadConfigPage() {
   loadCookies();
   loadSchedulerStatus();
+  checkAndShowApiQuota();
+}
+
+// Check for API key and show/hide quota tracker
+async function checkAndShowApiQuota() {
+  try {
+    const response = await api.get('/api/youtube-api/key');
+    const quotaSection = document.getElementById('api-quota-section');
+    
+    if (quotaSection) {
+      if (response.hasKey) {
+        quotaSection.style.display = 'block';
+        loadApiQuota();
+      } else {
+        quotaSection.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('Failed to check API key:', err);
+    const quotaSection = document.getElementById('api-quota-section');
+    if (quotaSection) {
+      quotaSection.style.display = 'none';
+    }
+  }
+}
+
+// Load API quota information
+async function loadApiQuota() {
+  try {
+    const quota = await api.get('/api/youtube-api/quota');
+    const quotaDisplay = document.getElementById('api-quota-display');
+    if (quotaDisplay && quota) {
+      const percentUsed = ((quota.used / quota.limit) * 100).toFixed(1);
+      quotaDisplay.innerHTML = `
+        <p><strong>API Quota:</strong> ${quota.used.toLocaleString()} / ${quota.limit.toLocaleString()} (${percentUsed}%)</p>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${percentUsed}%; background: ${percentUsed > 80 ? 'var(--error)' : 'var(--success)'}"></div>
+        </div>
+      `;
+    }
+  } catch (err) {
+    console.error('Failed to load API quota:', err);
+  }
 }
 
 async function viewChannel(channelId) {
