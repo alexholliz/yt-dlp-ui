@@ -26,18 +26,32 @@ jobs:
         run: |
           docker build --target test -t yt-dlp-ui:test .
 
-      - name: Run tests in Docker container
+      - name: Install dependencies
+        run: |
+          docker run --rm --entrypoint sh yt-dlp-ui:test -c "npm list --depth=0"
+
+      - name: Run unit tests
         run: |
           docker run --rm yt-dlp-ui:test
 
-      - name: Check if server starts
+      - name: Build production image
         run: |
           docker build --target production -t yt-dlp-ui:prod .
+
+      - name: Test server startup
+        run: |
           docker run -d --name test-server -p 8189:8189 yt-dlp-ui:prod
           sleep 5
+
+      - name: Verify server health
+        run: |
           curl -f http://localhost:8189 || exit 1
-          docker stop test-server
-        continue-on-error: true
+
+      - name: Cleanup test server
+        if: always()
+        run: |
+          docker stop test-server || true
+          docker rm test-server || true
 
   build:
     runs-on: ubuntu-latest
