@@ -124,7 +124,7 @@ class YtDlpService {
         stderr += data.toString();
       });
 
-      ytdlp.on('close', (code) => {
+      ytdlp.on('close', async (code) => {
         if (code !== 0) {
           return reject(new Error(`yt-dlp failed: ${stderr}`));
         }
@@ -168,7 +168,7 @@ class YtDlpService {
           // Convert to array and get accurate counts for each playlist
           const playlists = Array.from(playlistMap.values());
           
-          // Fetch accurate video counts in parallel (limit to 5 concurrent)
+          // Fetch accurate video counts in parallel
           const playlistsWithCounts = await Promise.all(
             playlists.map(async (playlist) => {
               try {
