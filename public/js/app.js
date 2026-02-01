@@ -593,8 +593,8 @@ async function viewChannel(channelId) {
 
           <div class="form-group">
             <label for="edit-yt-dlp-options-${channelId}">Custom yt-dlp options</label>
-            <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="--format best">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
-            <small>Space-separated yt-dlp command line options (leave blank if using a profile)</small>
+            <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="Example: --dateafter 20081004 --format-sort res:1080">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
+            <small>Advanced yt-dlp options only. Metadata/thumbnails/subtitles are controlled by toggles above.</small>
           </div>
           <div class="form-group">
             <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>

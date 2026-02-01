@@ -501,8 +501,8 @@
 
           <div class="form-group">
             <label for="yt-dlp-options">Custom yt-dlp options</label>
-            <textarea id="yt-dlp-options" placeholder="--format best" rows="3">-v --dateafter 20081004 -f "bv*[height=1080][ext=mp4]+(258/256/140) / best[height=1080] / b" --windows-filenames</textarea>
-            <small>Space-separated yt-dlp command line options (leave blank if using a profile)</small>
+            <textarea id="yt-dlp-options" placeholder="Example: --dateafter 20081004 --format-sort res:1080" rows="3"></textarea>
+            <small>Advanced yt-dlp options only. Metadata/thumbnails/subtitles are controlled by toggles above.</small>
           </div>
           <div class="form-group">
             <label for="rescrape-days">Re-scrape interval (days)</label>
@@ -589,8 +589,8 @@
             </h3>
             <div class="form-group">
               <label for="profile-additional-args">Extra yt-dlp Arguments</label>
-              <textarea id="profile-additional-args" rows="3" placeholder="--write-info-json --write-thumbnail"></textarea>
-              <small>Any additional yt-dlp command line options (space-separated). Examples: --write-info-json, --write-thumbnail, --dateafter 20200101, --embed-subs</small>
+              <textarea id="profile-additional-args" rows="3" placeholder="Example: --dateafter 20200101 --geo-bypass"></textarea>
+              <small>Advanced yt-dlp options only (space-separated). Note: Metadata/thumbnails/subtitles should be configured per-channel using toggles.</small>
             </div>
           </div>
 
@@ -677,8 +677,8 @@
             </h3>
             <div class="form-group">
               <label for="edit-profile-additional-args">Extra yt-dlp Arguments</label>
-              <textarea id="edit-profile-additional-args" rows="3" placeholder="--write-info-json --write-thumbnail"></textarea>
-              <small>Any additional yt-dlp command line options (space-separated). Examples: --write-info-json, --write-thumbnail, --dateafter 20200101, --embed-subs</small>
+              <textarea id="edit-profile-additional-args" rows="3" placeholder="Example: --dateafter 20200101 --geo-bypass"></textarea>
+              <small>Advanced yt-dlp options only (space-separated). Note: Metadata/thumbnails/subtitles should be configured per-channel using toggles.</small>
             </div>
           </div>
 
