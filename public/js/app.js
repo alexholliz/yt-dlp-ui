@@ -1081,13 +1081,28 @@ function updateComputedOptions(channelId, channel) {
       // 8. Filter and add custom options
       const customFiltered = [];
       if (customOptions) {
-        customOptions.split(/\s+/).forEach(arg => {
+        const customArgsParsed = customOptions.split(/\s+/);
+        
+        for (let i = 0; i < customArgsParsed.length; i++) {
+          const arg = customArgsParsed[i];
           const argWithoutValue = arg.split('=')[0];
-          if (!flagsToFilter.includes(argWithoutValue)) {
+          
+          // Check if this flag should be filtered
+          if (flagsToFilter.includes(argWithoutValue)) {
+            // Skip this flag
+            // Also skip next token if this flag takes a value (doesn't use = syntax)
+            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
+              const nextToken = customArgsParsed[i + 1];
+              // Skip next token if it's not a flag (it's the value)
+              if (!nextToken.startsWith('-')) {
+                i++; // Skip the value token
+              }
+            }
+          } else {
             customFiltered.push(arg);
             allArgs.push(arg);
           }
-        });
+        }
       }
       if (customFiltered.length > 0) {
         breakdown.push({
