@@ -596,13 +596,23 @@ async function viewChannel(channelId) {
             <textarea id="edit-yt-dlp-options-${channelId}" rows="3" placeholder="Example: --dateafter 20081004 --format-sort res:1080">${escapeHtml(channel.yt_dlp_options || '')}</textarea>
             <small>Advanced yt-dlp options only. Metadata/thumbnails/subtitles are controlled by toggles above.</small>
           </div>
+          
+          <!-- Computed Options Display -->
+          <div class="content-box" style="margin: 1rem 0; background: var(--surface-hover);">
+            <h4 style="margin-bottom: 0.5rem;">Final yt-dlp Options for This Channel</h4>
+            <div id="computed-options-${channelId}" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted); padding: 0.75rem; background: var(--background); border-radius: 4px; word-wrap: break-word; white-space: pre-wrap;">
+              Loading...
+            </div>
+            <small style="display: block; margin-top: 0.5rem;">This shows the actual flags that will be used when downloading. Toggles override conflicting flags in custom options.</small>
+          </div>
+          
           <div class="form-group">
             <label for="edit-rescrape-days-${channelId}">Re-scrape interval (days)</label>
             <input type="number" id="edit-rescrape-days-${channelId}" value="${channel.rescrape_interval_days || 7}" min="1">
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <button type="submit" class="btn btn-primary">Save Settings</button>
-            <button type="button" class="btn btn-danger" onclick="deleteChannel(${channelId}); return false;" style="margin-left: auto;">Delete Channel</button>
+            <button type="button" class="btn btn-danger" onclick="openDeleteChannelModal(${channelId}); return false;" style="margin-left: auto;">Delete Channel</button>
           </div>
         </form>
       </div>
@@ -613,6 +623,38 @@ async function viewChannel(channelId) {
     if (channel.profile_id) {
       document.getElementById(`edit-profile-${channelId}`).value = channel.profile_id;
     }
+    
+    // Compute and display final options
+    updateComputedOptions(channelId, channel);
+    
+    // Update computed options on any field change
+    const fieldsToWatch = [
+      `edit-profile-${channelId}`,
+      `edit-yt-dlp-options-${channelId}`,
+      `edit-download-metadata-${channelId}`,
+      `edit-embed-metadata-${channelId}`,
+      `edit-download-thumbnail-${channelId}`,
+      `edit-embed-thumbnail-${channelId}`,
+      `edit-download-subtitles-${channelId}`,
+      `edit-embed-subtitles-${channelId}`,
+      `edit-subtitle-languages-${channelId}`,
+      `edit-auto-subtitles-${channelId}`,
+      `edit-sponsorblock-enabled-${channelId}`,
+      `edit-sponsorblock-mode-${channelId}`
+    ];
+    
+    fieldsToWatch.forEach(fieldId => {
+      const element = document.getElementById(fieldId);
+      if (element) {
+        element.addEventListener('change', () => updateComputedOptions(channelId, channel));
+        element.addEventListener('input', () => updateComputedOptions(channelId, channel));
+      }
+    });
+    
+    // Watch SponsorBlock category changes
+    document.querySelectorAll(`.edit-sponsorblock-category-${channelId}`).forEach(cb => {
+      cb.addEventListener('change', () => updateComputedOptions(channelId, channel));
+    });
     
     // Add SponsorBlock toggle handler for edit form
     document.getElementById(`edit-sponsorblock-enabled-${channelId}`).addEventListener('change', function(e) {
@@ -858,18 +900,123 @@ async function saveChannelSettings(channelId, e) {
   }
 }
 
-async function deleteChannel(channelId) {
-  if (!confirm('Are you sure you want to delete this channel? This will also delete all associated playlists and videos.')) {
-    return;
-  }
+}
+
+// Delete Channel Modal
+let channelToDelete = null;
+
+function openDeleteChannelModal(channelId) {
+  channelToDelete = channelId;
+  document.getElementById('delete-channel-modal').style.display = 'flex';
+  document.getElementById('delete-files-toggle').checked = false;
+}
+
+function closeDeleteChannelModal() {
+  document.getElementById('delete-channel-modal').style.display = 'none';
+  channelToDelete = null;
+}
+
+async function confirmDeleteChannel() {
+  if (!channelToDelete) return;
+  
+  const deleteFiles = document.getElementById('delete-files-toggle').checked;
   
   try {
-    await api.delete(`/api/channels/${channelId}`);
+    await api.delete(`/api/channels/${channelToDelete}?deleteFiles=${deleteFiles}`);
     showNotification('Channel deleted successfully', 'success');
+    closeDeleteChannelModal();
     closeChannelModal();
-    loadChannelsPage(); // Refresh channels table
+    loadChannelsPage();
   } catch (err) {
     showNotification('Failed to delete channel: ' + err.message, 'error');
+  }
+}
+
+function updateComputedOptions(channelId, channel) {
+  try {
+    const options = [];
+    
+    // Get current toggle states
+    const downloadMetadata = document.getElementById(`edit-download-metadata-${channelId}`)?.checked;
+    const embedMetadata = document.getElementById(`edit-embed-metadata-${channelId}`)?.checked;
+    const downloadThumbnail = document.getElementById(`edit-download-thumbnail-${channelId}`)?.checked;
+    const embedThumbnail = document.getElementById(`edit-embed-thumbnail-${channelId}`)?.checked;
+    const downloadSubtitles = document.getElementById(`edit-download-subtitles-${channelId}`)?.checked;
+    const embedSubtitles = document.getElementById(`edit-embed-subtitles-${channelId}`)?.checked;
+    const subtitleLanguages = document.getElementById(`edit-subtitle-languages-${channelId}`)?.value.trim();
+    const autoSubtitles = document.getElementById(`edit-auto-subtitles-${channelId}`)?.checked;
+    const sponsorblockEnabled = document.getElementById(`edit-sponsorblock-enabled-${channelId}`)?.checked;
+    const sponsorblockMode = document.getElementById(`edit-sponsorblock-mode-${channelId}`)?.value;
+    const customOptions = document.getElementById(`edit-yt-dlp-options-${channelId}`)?.value.trim();
+    const profileId = document.getElementById(`edit-profile-${channelId}`)?.value;
+    
+    // Add toggle-based options
+    if (downloadMetadata) options.push('--write-info-json');
+    if (embedMetadata) options.push('--embed-metadata');
+    if (downloadThumbnail) options.push('--write-thumbnail');
+    if (embedThumbnail) options.push('--embed-thumbnail');
+    
+    if (downloadSubtitles || embedSubtitles) {
+      const langs = subtitleLanguages || 'en';
+      options.push(`--sub-langs ${langs}`);
+      if (downloadSubtitles) options.push('--write-subs');
+      if (embedSubtitles) options.push('--embed-subs');
+      if (autoSubtitles) options.push('--write-auto-subs');
+    }
+    
+    // Add SponsorBlock options
+    if (sponsorblockEnabled) {
+      const categories = Array.from(document.querySelectorAll(`.edit-sponsorblock-category-${channelId}:checked`))
+        .map(cb => cb.value).join(',');
+      if (categories) {
+        const mode = sponsorblockMode || 'mark';
+        options.push(`--sponsorblock-${mode} ${categories}`);
+      }
+    }
+    
+    // Filter custom options (only filter flags that have corresponding toggles ON)
+    const flagsToFilter = [];
+    if (downloadMetadata) flagsToFilter.push('--write-info-json');
+    if (embedMetadata) flagsToFilter.push('--embed-metadata');
+    if (downloadThumbnail) flagsToFilter.push('--write-thumbnail');
+    if (embedThumbnail) flagsToFilter.push('--embed-thumbnail');
+    if (downloadSubtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
+    if (embedSubtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
+    if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
+    if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
+    
+    if (customOptions) {
+      const customArgsParsed = customOptions.split(/\s+/);
+      const filtered = customArgsParsed.filter(arg => {
+        const argWithoutValue = arg.split('=')[0];
+        return !flagsToFilter.includes(argWithoutValue);
+      });
+      if (filtered.length > 0) {
+        options.push(...filtered);
+      }
+    }
+    
+    // Add profile args if selected
+    if (profileId) {
+      api.get(`/api/profiles/${profileId}`).then(profile => {
+        const profileOpts = [];
+        if (profile.format_selection) profileOpts.push(`-f "${profile.format_selection}"`);
+        if (profile.merge_output_format) profileOpts.push(`--merge-output-format ${profile.merge_output_format}`);
+        if (profile.additional_args) profileOpts.push(profile.additional_args);
+        
+        const allOptions = [...options, ...profileOpts];
+        document.getElementById(`computed-options-${channelId}`).textContent = 
+          allOptions.length > 0 ? allOptions.join(' ') : '(no additional options)';
+      }).catch(() => {
+        document.getElementById(`computed-options-${channelId}`).textContent = 
+          options.length > 0 ? options.join(' ') : '(no additional options)';
+      });
+    } else {
+      document.getElementById(`computed-options-${channelId}`).textContent = 
+        options.length > 0 ? options.join(' ') : '(no additional options)';
+    }
+  } catch (err) {
+    console.error('Failed to update computed options:', err);
   }
 }
 
