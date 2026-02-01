@@ -603,7 +603,15 @@ async function viewChannel(channelId) {
             <div id="computed-options-${channelId}" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted); padding: 0.75rem; background: var(--background); border-radius: 4px; word-wrap: break-word; white-space: pre-wrap;">
               Loading...
             </div>
-            <small style="display: block; margin-top: 0.5rem;">This shows the actual flags that will be used when downloading. Toggles override conflicting flags in custom options.</small>
+            <small style="display: block; margin-top: 0.5rem;">This shows the actual flags that will be used when downloading.</small>
+            
+            <!-- Options Breakdown by Source -->
+            <div id="options-breakdown-${channelId}" style="margin-top: 1rem; padding: 0.75rem; background: var(--background); border-radius: 4px; font-size: 0.85rem;">
+              <strong style="display: block; margin-bottom: 0.5rem;">Options Source Breakdown:</strong>
+              <div id="breakdown-content-${channelId}" style="color: var(--text-muted); line-height: 1.6;">
+                Loading...
+              </div>
+            </div>
           </div>
           
           <div class="form-group">
@@ -948,30 +956,70 @@ function updateComputedOptions(channelId, channel) {
     
     const computeFinal = (profile = null) => {
       const allArgs = [];
+      const breakdown = [];
       
       // 1. Format selection (from profile or default)
       const format = profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best';
-      allArgs.push(`-f "${format}"`);
+      const formatArg = `-f "${format}"`;
+      allArgs.push(formatArg);
+      breakdown.push({
+        icon: profile ? '🎯' : '⚙️',
+        source: profile ? 'yt-dlp Profile (format)' : 'Default Format',
+        flags: formatArg
+      });
       
       // 2. Merge output format (from profile or default)
       const mergeFormat = profile?.merge_output_format || 'mp4';
-      allArgs.push(`--merge-output-format ${mergeFormat}`);
+      const mergeArg = `--merge-output-format ${mergeFormat}`;
+      allArgs.push(mergeArg);
+      breakdown.push({
+        icon: profile ? '🎯' : '⚙️',
+        source: profile ? 'yt-dlp Profile (merge)' : 'Default Merge Format',
+        flags: mergeArg
+      });
       
       // 3. Metadata toggles (converted to flags by ytdlp-service)
-      if (downloadMetadata) allArgs.push('--write-info-json');
-      if (embedMetadata) allArgs.push('--embed-metadata');
+      const metadataFlags = [];
+      if (downloadMetadata) metadataFlags.push('--write-info-json');
+      if (embedMetadata) metadataFlags.push('--embed-metadata');
+      if (metadataFlags.length > 0) {
+        allArgs.push(...metadataFlags);
+        breakdown.push({
+          icon: '🎚️',
+          source: 'Metadata Toggles',
+          flags: metadataFlags.join(' ')
+        });
+      }
       
       // 4. Thumbnail toggles (converted to flags by ytdlp-service)
-      if (downloadThumbnail) allArgs.push('--write-thumbnail');
-      if (embedThumbnail) allArgs.push('--embed-thumbnail');
+      const thumbnailFlags = [];
+      if (downloadThumbnail) thumbnailFlags.push('--write-thumbnail');
+      if (embedThumbnail) thumbnailFlags.push('--embed-thumbnail');
+      if (thumbnailFlags.length > 0) {
+        allArgs.push(...thumbnailFlags);
+        breakdown.push({
+          icon: '🎚️',
+          source: 'Thumbnail Toggles',
+          flags: thumbnailFlags.join(' ')
+        });
+      }
       
       // 5. Subtitle options (in customArgs)
+      const subtitleFlags = [];
       if (downloadSubtitles || embedSubtitles) {
         const langs = subtitleLanguages || 'en';
-        allArgs.push(`--sub-langs ${langs}`);
-        if (downloadSubtitles) allArgs.push('--write-subs');
-        if (embedSubtitles) allArgs.push('--embed-subs');
-        if (autoSubtitles) allArgs.push('--write-auto-subs');
+        subtitleFlags.push(`--sub-langs ${langs}`);
+        if (downloadSubtitles) subtitleFlags.push('--write-subs');
+        if (embedSubtitles) subtitleFlags.push('--embed-subs');
+        if (autoSubtitles) subtitleFlags.push('--write-auto-subs');
+      }
+      if (subtitleFlags.length > 0) {
+        allArgs.push(...subtitleFlags);
+        breakdown.push({
+          icon: '🎚️',
+          source: 'Subtitle Toggles',
+          flags: subtitleFlags.join(' ')
+        });
       }
       
       // 6. SponsorBlock options (in customArgs)
@@ -980,13 +1028,25 @@ function updateComputedOptions(channelId, channel) {
           .map(cb => cb.value).join(',');
         if (categories) {
           const mode = sponsorblockMode || 'mark';
-          allArgs.push(`--sponsorblock-${mode} ${categories}`);
+          const sbFlag = `--sponsorblock-${mode} ${categories}`;
+          allArgs.push(sbFlag);
+          breakdown.push({
+            icon: '📺',
+            source: 'SponsorBlock Settings',
+            flags: sbFlag
+          });
         }
       }
       
       // 7. Profile additional args (in customArgs)
       if (profile && profile.additional_args) {
-        profile.additional_args.split(/\s+/).forEach(arg => allArgs.push(arg));
+        const profileArgs = profile.additional_args.split(/\s+/);
+        allArgs.push(...profileArgs);
+        breakdown.push({
+          icon: '🎯',
+          source: 'yt-dlp Profile (additional)',
+          flags: profile.additional_args
+        });
       }
       
       // 8. Filter and add custom options (filtered against toggles only)
@@ -1000,30 +1060,66 @@ function updateComputedOptions(channelId, channel) {
       if (autoSubtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
       if (downloadSubtitles || embedSubtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
       
+      const customFiltered = [];
       if (customOptions) {
         customOptions.split(/\s+/).forEach(arg => {
           const argWithoutValue = arg.split('=')[0];
           if (!flagsToFilter.includes(argWithoutValue)) {
+            customFiltered.push(arg);
             allArgs.push(arg);
           }
+        });
+      }
+      if (customFiltered.length > 0) {
+        breakdown.push({
+          icon: '✏️',
+          source: 'Custom yt-dlp Options',
+          flags: customFiltered.join(' ')
         });
       }
       
       // 9. Add fixed flags that are always present
       allArgs.push('--no-restrict-filenames');
+      breakdown.push({
+        icon: '🔒',
+        source: 'Always Included',
+        flags: '--no-restrict-filenames'
+      });
       
-      return allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)';
+      return {
+        combined: allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)',
+        breakdown: breakdown
+      };
     };
     
     // Fetch profile if selected, otherwise compute immediately
     if (profileId) {
       api.get(`/api/profiles/${profileId}`).then(profile => {
-        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal(profile);
+        const result = computeFinal(profile);
+        document.getElementById(`computed-options-${channelId}`).textContent = result.combined;
+        
+        // Build breakdown HTML
+        const breakdownHtml = result.breakdown.map(item => 
+          `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
+        ).join('');
+        document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
       }).catch(() => {
-        document.getElementById(`computed-options-${channelId}`).textContent = computeFinal();
+        const result = computeFinal();
+        document.getElementById(`computed-options-${channelId}`).textContent = result.combined;
+        
+        const breakdownHtml = result.breakdown.map(item => 
+          `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
+        ).join('');
+        document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
       });
     } else {
-      document.getElementById(`computed-options-${channelId}`).textContent = computeFinal();
+      const result = computeFinal();
+      document.getElementById(`computed-options-${channelId}`).textContent = result.combined;
+      
+      const breakdownHtml = result.breakdown.map(item => 
+        `<div style="margin-bottom: 0.25rem;"><strong>${item.icon} ${item.source}:</strong> <code style="color: var(--primary);">${item.flags}</code></div>`
+      ).join('');
+      document.getElementById(`breakdown-content-${channelId}`).innerHTML = breakdownHtml;
     }
   } catch (err) {
     console.error('Failed to update computed options:', err);
