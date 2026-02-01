@@ -239,36 +239,20 @@ class DownloadManager {
       profile = this.db.getProfile(channel.profile_id);
     }
 
-    // Build list of flags to filter from custom options
-    const flagsToFilter = [];
-    
-    // Filter toggle-based flags (only if toggles are ON)
-    if (channel.download_metadata) flagsToFilter.push('--write-info-json');
-    if (channel.embed_metadata) flagsToFilter.push('--embed-metadata');
-    if (channel.download_thumbnail) flagsToFilter.push('--write-thumbnail');
-    if (channel.embed_thumbnail) flagsToFilter.push('--embed-thumbnail');
-    if (channel.download_subtitles) flagsToFilter.push('--write-subs', '--write-subtitles');
-    if (channel.embed_subtitles) flagsToFilter.push('--embed-subs', '--embed-subtitles');
-    if (channel.auto_subtitles) flagsToFilter.push('--write-auto-subs', '--write-automatic-subs');
-    if (channel.download_subtitles || channel.embed_subtitles) flagsToFilter.push('--sub-lang', '--sub-langs');
-    
-    // Filter profile format/merge flags (always filter these)
-    if (profile) {
-      if (profile.format_selection) flagsToFilter.push('-f', '--format');
-      if (profile.merge_output_format) flagsToFilter.push('--merge-output-format');
-      
-      // Parse profile additional args and add to filter list
-      if (profile.additional_args) {
-        profile.additional_args.split(/\s+/).forEach(arg => {
-          const flagName = arg.split('=')[0];
-          if (flagName.startsWith('-')) {
-            flagsToFilter.push(flagName);
-          }
-        });
-      }
-    }
+    // NEW HIERARCHY: Toggles > Custom > Profile
+    // Step 1: Collect toggle flags (highest priority - filter from both custom AND profile)
+    const toggleFlags = [];
+    if (channel.download_metadata) toggleFlags.push('--write-info-json');
+    if (channel.embed_metadata) toggleFlags.push('--embed-metadata');
+    if (channel.download_thumbnail) toggleFlags.push('--write-thumbnail');
+    if (channel.embed_thumbnail) toggleFlags.push('--embed-thumbnail');
+    if (channel.download_subtitles) toggleFlags.push('--write-subs', '--write-subtitles');
+    if (channel.embed_subtitles) toggleFlags.push('--embed-subs', '--embed-subtitles');
+    if (channel.auto_subtitles) toggleFlags.push('--write-auto-subs', '--write-automatic-subs');
+    if (channel.download_subtitles || channel.embed_subtitles) toggleFlags.push('--sub-lang', '--sub-langs');
 
-    // Parse and filter custom yt-dlp options
+    // Step 2: Filter custom options (remove toggle conflicts only)
+    const customFlags = [];
     let filteredCustomArgs = '';
     if (channel.yt_dlp_options) {
       const customArgsParsed = channel.yt_dlp_options.split(/\s+/);
@@ -278,17 +262,13 @@ class DownloadManager {
         const arg = customArgsParsed[i];
         const argWithoutValue = arg.split('=')[0];
         
-        // Check if this flag should be filtered
-        if (flagsToFilter.includes(argWithoutValue)) {
-          // Skip this flag
-          // Also skip the value if this flag takes a value
+        // Only filter if toggle has this flag
+        if (toggleFlags.includes(argWithoutValue)) {
+          // Skip this flag and its value
           if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < customArgsParsed.length) {
             const nextToken = customArgsParsed[i + 1];
-            // Skip next token if it's not a flag (it's the value)
             if (!nextToken.startsWith('-')) {
-              i++; // Skip the value token
-              
-              // If value starts with quote, consume until closing quote
+              i++;
               if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
                 while (i + 1 < customArgsParsed.length && !customArgsParsed[i].endsWith('"')) {
                   i++;
@@ -298,61 +278,81 @@ class DownloadManager {
           }
         } else {
           filtered.push(arg);
+          // Track custom flags for filtering profile
+          if (argWithoutValue.startsWith('-')) {
+            customFlags.push(argWithoutValue);
+          }
         }
       }
       
       filteredCustomArgs = filtered.join(' ');
     }
 
-    // Build enhanced yt-dlp options
+    // Step 3: Build enhanced toggle args
     const enhancedArgs = [];
-    
-    // Subtitle options
     if (channel.download_subtitles || channel.embed_subtitles) {
       const languages = channel.subtitle_languages || 'en';
       enhancedArgs.push(`--sub-langs ${languages}`);
-      
-      if (channel.download_subtitles) {
-        enhancedArgs.push('--write-subs');
-      }
-      if (channel.embed_subtitles) {
-        enhancedArgs.push('--embed-subs');
-      }
-      if (channel.auto_subtitles) {
-        enhancedArgs.push('--write-auto-subs');
-      }
+      if (channel.download_subtitles) enhancedArgs.push('--write-subs');
+      if (channel.embed_subtitles) enhancedArgs.push('--embed-subs');
+      if (channel.auto_subtitles) enhancedArgs.push('--write-auto-subs');
     }
 
-    // Build SponsorBlock arguments if enabled
+    // Step 4: Build SponsorBlock args
     let sponsorblockArgs = '';
     if (channel.sponsorblock_enabled && channel.sponsorblock_categories) {
       const mode = channel.sponsorblock_mode || 'mark';
       const categories = channel.sponsorblock_categories;
+      sponsorblockArgs = mode === 'mark' 
+        ? `--sponsorblock-mark ${categories}`
+        : `--sponsorblock-remove ${categories}`;
+    }
+
+    // Step 5: Filter profile args (remove toggle AND custom conflicts)
+    let filteredProfileArgs = '';
+    if (profile) {
+      const filterList = [...toggleFlags, ...customFlags];
       
-      if (mode === 'mark') {
-        sponsorblockArgs = `--sponsorblock-mark ${categories}`;
-      } else if (mode === 'remove') {
-        sponsorblockArgs = `--sponsorblock-remove ${categories}`;
+      // Don't add format/merge to profile args if they're base properties
+      if (profile.additional_args) {
+        const profileArgsParsed = profile.additional_args.split(/\s+/);
+        const filtered = [];
+        
+        for (let i = 0; i < profileArgsParsed.length; i++) {
+          const arg = profileArgsParsed[i];
+          const argWithoutValue = arg.split('=')[0];
+          
+          if (filterList.includes(argWithoutValue)) {
+            // Skip this flag and its value
+            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
+              const nextToken = profileArgsParsed[i + 1];
+              if (!nextToken.startsWith('-')) {
+                i++;
+                if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                  while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
+                    i++;
+                  }
+                }
+              }
+            }
+          } else {
+            filtered.push(arg);
+          }
+        }
+        
+        filteredProfileArgs = filtered.join(' ');
       }
     }
 
-    // Add profile additional args if present
-    let profileAdditionalArgs = '';
-    if (profile && profile.additional_args) {
-      profileAdditionalArgs = profile.additional_args;
-    }
-
-    // Combine all args: enhanced options + SponsorBlock + profile additional + filtered custom args
-    const allArgs = [enhancedArgs.join(' '), sponsorblockArgs, profileAdditionalArgs, filteredCustomArgs]
+    // Step 6: Combine all args in priority order: Toggles > SponsorBlock > Custom > Profile
+    const allArgs = [enhancedArgs.join(' '), sponsorblockArgs, filteredCustomArgs, filteredProfileArgs]
       .filter(Boolean)
       .join(' ')
       .trim();
 
-    // Check if any filesystem options are present in the combined args
+    // Step 7: Handle filesystem options
     const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
     const hasFilesystemOption = filesystemOptions.some(opt => allArgs.includes(opt));
-    
-    // Only add --no-restrict-filenames if no other filesystem options are present
     const customArgs = hasFilesystemOption ? allArgs : (allArgs ? `${allArgs} --no-restrict-filenames` : '--no-restrict-filenames');
 
     return {
@@ -360,13 +360,11 @@ class DownloadManager {
       outputTemplate,
       format: profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
       mergeOutputFormat: profile?.merge_output_format || 'mp4',
-      // Metadata options (handled by ytdlp-service)
       writeInfoJson: channel.download_metadata,
       embedMetadata: channel.embed_metadata,
-      // Thumbnail options (handled by ytdlp-service)
       writeThumbnail: channel.download_thumbnail,
       embedThumbnail: channel.embed_thumbnail,
-      noRestrictFilenames: !hasFilesystemOption, // Only set if no filesystem options present
+      noRestrictFilenames: !hasFilesystemOption,
       downloadArchive: path.join(this.downloadsPath, '.downloaded'),
       customArgs: customArgs || null,
       playlistMetadata: {
