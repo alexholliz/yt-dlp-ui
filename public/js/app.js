@@ -963,6 +963,7 @@ function updateComputedOptions(channelId, channel) {
     const profileId = document.getElementById(`edit-profile-${channelId}`)?.value;
     
     const computeFinal = (profile = null) => {
+      const profileName = profile?.name || 'Profile';
       const allArgs = [];
       const breakdown = [];
       const conflicts = [];
@@ -1135,10 +1136,12 @@ function updateComputedOptions(channelId, channel) {
             
             if (overrideSource) {
               conflicts.push({
-                customFlag: fullCustomArg,
-                overrideIcon,
-                overrideSource,
-                overrideFlag
+                winnerIcon: overrideIcon,
+                winnerSource: overrideSource,
+                winnerFlag: overrideFlag,
+                loserIcon: '✏️',
+                loserSource: 'Channel custom yt-dlp Options',
+                loserFlag: fullCustomArg
               });
             }
           } else {
@@ -1223,20 +1226,24 @@ function updateComputedOptions(channelId, channel) {
               
               if (overrideSource) {
                 conflicts.push({
-                  customFlag: `🎯 ${fullProfileArg}`,
-                  overrideIcon: '🎚️',
-                  overrideSource,
-                  overrideFlag
+                  winnerIcon: '🎚️',
+                  winnerSource: overrideSource,
+                  winnerFlag: overrideFlag,
+                  loserIcon: '🎯',
+                  loserSource: `${profileName} custom yt-dlp options`,
+                  loserFlag: fullProfileArg
                 });
               }
             } else if (customFlags.includes(argWithoutValue)) {
               // Custom is overriding profile
               const customArg = customFiltered.find(c => c.split('=')[0] === argWithoutValue) || argWithoutValue;
               conflicts.push({
-                customFlag: `🎯 Profile: ${fullProfileArg}`,
-                overrideIcon: '✏️',
-                overrideSource: 'Custom yt-dlp Options',
-                overrideFlag: customArg
+                winnerIcon: '✏️',
+                winnerSource: 'Channel custom yt-dlp Options',
+                winnerFlag: customArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} custom yt-dlp options`,
+                loserFlag: fullProfileArg
               });
             }
           } else {
@@ -1289,8 +1296,8 @@ function updateComputedOptions(channelId, channel) {
         // Display conflicts if any
         if (result.conflicts.length > 0) {
           const conflictsHtml = result.conflicts.map(conflict => 
-            `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
-            `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+            `<div style="margin-bottom: 0.5rem;">${conflict.winnerIcon} <strong>${conflict.winnerSource}:</strong> <code style="color: var(--primary);">${conflict.winnerFlag}</code><br/>` +
+            `&nbsp;&nbsp;&nbsp;&nbsp;<strong>overrides</strong> ${conflict.loserIcon} <strong>${conflict.loserSource}:</strong> <code>${conflict.loserFlag}</code></div>`
           ).join('');
           document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
           document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
@@ -1309,8 +1316,8 @@ function updateComputedOptions(channelId, channel) {
         // Display conflicts if any
         if (result.conflicts.length > 0) {
           const conflictsHtml = result.conflicts.map(conflict => 
-            `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
-            `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+            `<div style="margin-bottom: 0.5rem;">${conflict.winnerIcon} <strong>${conflict.winnerSource}:</strong> <code style="color: var(--primary);">${conflict.winnerFlag}</code><br/>` +
+            `&nbsp;&nbsp;&nbsp;&nbsp;<strong>overrides</strong> ${conflict.loserIcon} <strong>${conflict.loserSource}:</strong> <code>${conflict.loserFlag}</code></div>`
           ).join('');
           document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
           document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
@@ -1330,8 +1337,8 @@ function updateComputedOptions(channelId, channel) {
       // Display conflicts if any
       if (result.conflicts.length > 0) {
         const conflictsHtml = result.conflicts.map(conflict => 
-          `<div style="margin-bottom: 0.5rem;">✏️ <strong>Custom yt-dlp Options:</strong> <code>${conflict.customFlag}</code><br/>` +
-          `&nbsp;&nbsp;&nbsp;&nbsp;overridden by ${conflict.overrideIcon} <strong>${conflict.overrideSource}:</strong> <code style="color: var(--primary);">${conflict.overrideFlag}</code></div>`
+          `<div style="margin-bottom: 0.5rem;">${conflict.winnerIcon} <strong>${conflict.winnerSource}:</strong> <code style="color: var(--primary);">${conflict.winnerFlag}</code><br/>` +
+          `&nbsp;&nbsp;&nbsp;&nbsp;<strong>overrides</strong> ${conflict.loserIcon} <strong>${conflict.loserSource}:</strong> <code>${conflict.loserFlag}</code></div>`
         ).join('');
         document.getElementById(`conflicts-content-${channelId}`).innerHTML = conflictsHtml;
         document.getElementById(`conflicts-box-${channelId}`).style.display = 'block';
