@@ -822,6 +822,15 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-02-01):**
+- **IMPLEMENTED: Database Migration Helper** (CODE QUALITY)
+  - Created `addColumnIfMissing(table, column, definition)` helper method in DB class
+  - Replaced all 22 migration blocks with single-line calls
+  - Reduced migration code from ~160 lines to 23 lines (107 line reduction)
+  - Tested with fresh database: 19 migrations run successfully
+  - Maintains idempotency and backward compatibility
+  - Pattern: `this.addColumnIfMissing('channels', 'profile_id', 'INTEGER REFERENCES profiles(id)')`
+  - Total refactoring savings to date: 246 lines (Delete Modals: 139 + Migrations: 107)
+  - Updated REFACTORING_TARGETS.md: marked migration refactor complete
 - **IMPLEMENTED: Complete Option Hierarchy System** (MAJOR FEATURE)
   - 4-level hierarchy: Channel Toggles > Channel Custom > Profile Toggles > Profile Additional
   - Channel toggles (metadata, thumbnails, subtitles, SponsorBlock) override everything
@@ -878,7 +887,8 @@ open http://localhost:8189
   - Changed final command preview heading to "yt-dlp Command Used for This Channel"
 
 **Files Modified:**
-- `src/database.js` - Added profiles verbose/filename_format columns, created config table
+- `src/database.js` - Added migration helper method, refactored all migrations to use helper, added profiles verbose/filename_format columns, created config table
+- `REFACTORING_TARGETS.md` - Updated with completed migration refactor status and actual line savings
 - `src/server.js` - Updated profile endpoints, added config API, added ytdlp injection for handle resolution
 - `src/download-manager.js` - Implemented 4-level hierarchy, fixed downloadPlaylist(), filesystem exclusivity
 - `src/logger.js` - Configurable log level/rotation, default changed to 'error'
@@ -888,6 +898,8 @@ open http://localhost:8189
 - `public/js/app.js` - Complete refactor of updateComputedOptions() for hierarchy, conflict detection, argument maps
 
 **Technical Achievements:**
+- Database migration helper reduces code duplication and improves maintainability
+- 246 total lines saved through refactoring (Delete Modals + Migrations)
 - Frontend preview logic now 100% matches backend download logic
 - Complete visibility into option conflicts and overrides
 - Smart filesystem flag handling prevents incompatible combinations
