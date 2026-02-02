@@ -5,7 +5,9 @@
 This document identifies duplicate code patterns in the codebase and prioritizes refactoring opportunities. Organized by impact (instances × duplicate lines = total potential savings).
 
 **Last Updated:** 2026-02-01  
-**Total Potential Savings:** ~286 lines (~8-10% of codebase)
+**Total Potential Savings:** ~286 lines (~8-10% of codebase)  
+**Completed Savings:** 246 lines (Delete Modals: 139 + Migration Helper: 107)  
+**Remaining Potential:** ~40 lines (after adjusting for actual vs estimated savings)
 
 ---
 
@@ -13,7 +15,7 @@ This document identifies duplicate code patterns in the codebase and prioritizes
 
 | Rank | Pattern | Instances | Dup Lines | Total Savings | Priority | Status |
 |------|---------|-----------|-----------|---------------|----------|--------|
-| 1 | Database Migrations | 13 | 7 | **91 lines** | 🔴 CRITICAL | ❌ Not Started |
+| 1 | Database Migrations | 13 | 7 | **91 lines** | 🔴 CRITICAL | ✅ **COMPLETED** |
 | 2 | Modal HTML Structure | 7 | 18 | **126 lines** | 🟠 HIGH | ❌ Not Started |
 | 3 | API Error Handling | 35 | 2 | **70 lines** | 🟠 HIGH | ❌ Not Started |
 | 4 | Form Handlers | 3 | 25 | **75 lines** | 🟡 MEDIUM | ❌ Not Started |
@@ -25,9 +27,19 @@ This document identifies duplicate code patterns in the codebase and prioritizes
 
 ## 🔴 CRITICAL PRIORITY
 
-### 1. Database Migrations (91 lines potential savings)
+### 1. Database Migrations ✅ COMPLETED (107 lines saved)
 
-**Current Pattern (13 instances in database.js):**
+**Status**: Completed 2026-02-01  
+**Actual Savings**: 107 lines (149 deleted - 42 added)  
+
+**Implementation**:
+- Added `addColumnIfMissing(table, column, definition)` helper method to DB class
+- Replaced all 22 migration blocks with single-line calls
+- Reduced migration code from ~160 lines to 23 lines
+- Tested and verified with fresh database (19 migrations ran successfully)
+- Maintains backward compatibility and idempotency
+
+**Original Pattern (was repeated 13 times in database.js):**
 ```javascript
 try {
   const result = this.db.exec("PRAGMA table_info(profiles)");
@@ -365,8 +377,8 @@ function renderEmptyState(tbody, colspan, message = 'No items found') {
 ## Implementation Recommendations
 
 ### **Phase 1: Quick Wins** (Est: 1-2 hours)
-1. ✅ Delete Modal Template - DONE
-2. ⬜ Database Migration Helper - 30 min, high impact
+1. ✅ Delete Modal Template - DONE (139 lines saved)
+2. ✅ Database Migration Helper - DONE (107 lines saved)
 3. ⬜ Modal Control Utilities - 20 min, moderate impact
 4. ⬜ Table Empty State Utility - 10 min, low impact
 
@@ -664,8 +676,9 @@ function renderEmptyState(tbody, colspan, message = 'No items found') {
    - Quick polish
 
 **Total Est. Time:** 2 hours  
-**Total Savings:** ~211 lines  
-**Deferred:** Form handlers (complex), Modal HTML (acceptable duplication)
+**Total Planned:** ~211 lines  
+**Actual Completed:** 246 lines (Delete Modal: 139 + Migration Helper: 107)  
+**Remaining Quick Wins:** Modal Control (42 lines) + Table Empty State (8 lines) + API Error Handler (70 lines) = ~120 lines
 
 ---
 

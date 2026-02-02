@@ -26,6 +26,24 @@ class DB {
     this.statsCache.timestamp = 0;
     this.channelStatsCache.timestamp = 0;
   }
+  
+  // Migration helper to reduce duplication
+  addColumnIfMissing(table, column, definition) {
+    try {
+      const result = this.db.exec(`PRAGMA table_info(${table})`);
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes(column)) {
+        this.db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        this.save();
+        console.log(`Migration: Added ${column} column to ${table} table`);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.log(`Migration check for ${table}.${column} skipped or already applied`);
+      return false;
+    }
+  }
 
   async init() {
     const dir = path.dirname(this.dbPath);
@@ -150,157 +168,32 @@ class DB {
         ('log_max_files', '5');
     `);
     
-    // Migration: Add verbose and filename_format columns to profiles if they don't exist
-    try {
-      const result = this.db.exec("PRAGMA table_info(profiles)");
-      const columns = result[0]?.values.map(row => row[1]) || [];
-      if (!columns.includes('verbose')) {
-        this.db.run("ALTER TABLE profiles ADD COLUMN verbose INTEGER DEFAULT 0");
-        this.save();
-        console.log('Migration: Added verbose column to profiles table');
-      }
-      if (!columns.includes('filename_format')) {
-        this.db.run("ALTER TABLE profiles ADD COLUMN filename_format TEXT DEFAULT '--no-restrict-filenames'");
-        this.save();
-        console.log('Migration: Added filename_format column to profiles table');
-      }
-    } catch (err) {
-      console.log('Migration check for profiles columns skipped or already applied');
-    }
+    // Database migrations - add columns if missing
+    this.addColumnIfMissing('profiles', 'verbose', 'INTEGER DEFAULT 0');
+    this.addColumnIfMissing('profiles', 'filename_format', "TEXT DEFAULT '--no-restrict-filenames'");
     
-    // Migration: Add video_count column if it doesn't exist
-    try {
-      const result = this.db.exec("PRAGMA table_info(playlists)");
-      const columns = result[0]?.values.map(row => row[1]) || [];
-      if (!columns.includes('video_count')) {
-        this.db.run("ALTER TABLE playlists ADD COLUMN video_count INTEGER DEFAULT 0");
-        this.save();
-        console.log('Migration: Added video_count column to playlists table');
-      }
-    } catch (err) {
-      console.warn('Migration check failed:', err.message);
-    }
+    this.addColumnIfMissing('playlists', 'video_count', 'INTEGER DEFAULT 0');
     
-    // Migration: Add file_size and error_message columns to videos if they don't exist
-    try {
-      const result = this.db.exec("PRAGMA table_info(videos)");
-      const columns = result[0]?.values.map(row => row[1]) || [];
-      if (!columns.includes('file_size')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN file_size INTEGER DEFAULT 0");
-        this.save();
-        console.log('Migration: Added file_size column to videos table');
-      }
-      if (!columns.includes('error_message')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN error_message TEXT");
-        this.save();
-        console.log('Migration: Added error_message column to videos table');
-      }
-      if (!columns.includes('resolution')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN resolution TEXT");
-        this.save();
-        console.log('Migration: Added resolution column to videos table');
-      }
-      if (!columns.includes('fps')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN fps INTEGER");
-        this.save();
-        console.log('Migration: Added fps column to videos table');
-      }
-      if (!columns.includes('vcodec')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN vcodec TEXT");
-        this.save();
-        console.log('Migration: Added vcodec column to videos table');
-      }
-      if (!columns.includes('acodec')) {
-        this.db.run("ALTER TABLE videos ADD COLUMN acodec TEXT");
-        this.save();
-        console.log('Migration: Added acodec column to videos table');
-      }
-    } catch (err) {
-      console.warn('Migration check for videos failed:', err.message);
-    }
-
-    // Migration: Add profile_id to channels
-    try {
-      const result = this.db.exec("PRAGMA table_info(channels)");
-      const columns = result[0]?.values.map(row => row[1]) || [];
-      if (!columns.includes('profile_id')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN profile_id INTEGER REFERENCES profiles(id)");
-        this.save();
-        console.log('Migration: Added profile_id column to channels table');
-      }
-    } catch (err) {
-      console.warn('Migration check for channels failed:', err.message);
-    }
-
-    // Migration: Add SponsorBlock options to channels
-    try {
-      const result = this.db.exec("PRAGMA table_info(channels)");
-      const columns = result[0]?.values.map(row => row[1]) || [];
-      if (!columns.includes('sponsorblock_enabled')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_enabled BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added sponsorblock_enabled column to channels table');
-      }
-      if (!columns.includes('sponsorblock_mode')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_mode TEXT DEFAULT 'mark'");
-        this.save();
-        console.log('Migration: Added sponsorblock_mode column to channels table');
-      }
-      if (!columns.includes('sponsorblock_categories')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN sponsorblock_categories TEXT");
-        this.save();
-        console.log('Migration: Added sponsorblock_categories column to channels table');
-      }
-      if (!columns.includes('enabled')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN enabled BOOLEAN DEFAULT 1");
-        this.save();
-        console.log('Migration: Added enabled column to channels table');
-      }
-      
-      // Enhanced yt-dlp options
-      if (!columns.includes('download_metadata')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN download_metadata BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added download_metadata column to channels table');
-      }
-      if (!columns.includes('embed_metadata')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN embed_metadata BOOLEAN DEFAULT 1");
-        this.save();
-        console.log('Migration: Added embed_metadata column to channels table');
-      }
-      if (!columns.includes('download_thumbnail')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN download_thumbnail BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added download_thumbnail column to channels table');
-      }
-      if (!columns.includes('embed_thumbnail')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN embed_thumbnail BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added embed_thumbnail column to channels table');
-      }
-      if (!columns.includes('download_subtitles')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN download_subtitles BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added download_subtitles column to channels table');
-      }
-      if (!columns.includes('embed_subtitles')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN embed_subtitles BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added embed_subtitles column to channels table');
-      }
-      if (!columns.includes('subtitle_languages')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN subtitle_languages TEXT DEFAULT 'en'");
-        this.save();
-        console.log('Migration: Added subtitle_languages column to channels table');
-      }
-      if (!columns.includes('auto_subtitles')) {
-        this.db.run("ALTER TABLE channels ADD COLUMN auto_subtitles BOOLEAN DEFAULT 0");
-        this.save();
-        console.log('Migration: Added auto_subtitles column to channels table');
-      }
-    } catch (err) {
-      console.warn('Migration check failed:', err.message);
-    }
+    this.addColumnIfMissing('videos', 'file_size', 'INTEGER DEFAULT 0');
+    this.addColumnIfMissing('videos', 'error_message', 'TEXT');
+    this.addColumnIfMissing('videos', 'resolution', 'TEXT');
+    this.addColumnIfMissing('videos', 'fps', 'INTEGER');
+    this.addColumnIfMissing('videos', 'vcodec', 'TEXT');
+    this.addColumnIfMissing('videos', 'acodec', 'TEXT');
+    
+    this.addColumnIfMissing('channels', 'profile_id', 'INTEGER REFERENCES profiles(id)');
+    this.addColumnIfMissing('channels', 'sponsorblock_enabled', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'sponsorblock_mode', "TEXT DEFAULT 'mark'");
+    this.addColumnIfMissing('channels', 'sponsorblock_categories', 'TEXT');
+    this.addColumnIfMissing('channels', 'enabled', 'BOOLEAN DEFAULT 1');
+    this.addColumnIfMissing('channels', 'download_metadata', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'embed_metadata', 'BOOLEAN DEFAULT 1');
+    this.addColumnIfMissing('channels', 'download_thumbnail', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'embed_thumbnail', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'download_subtitles', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'embed_subtitles', 'BOOLEAN DEFAULT 0');
+    this.addColumnIfMissing('channels', 'subtitle_languages', "TEXT DEFAULT 'en'");
+    this.addColumnIfMissing('channels', 'auto_subtitles', 'BOOLEAN DEFAULT 0');
   }
 
   // Profiles
