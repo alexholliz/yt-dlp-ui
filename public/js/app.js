@@ -738,35 +738,36 @@ async function viewVideo(videoId) {
   }
 }
 
-// Delete Video Modal
-let videoToDelete = null;
-
+// Delete Video Modal - now using generic modal
 function openDeleteVideoModal(videoId) {
-  videoToDelete = videoId;
-  document.getElementById('delete-video-modal').style.display = 'flex';
-  document.getElementById('delete-video-files-toggle').checked = false;
+  openDeleteModal({
+    type: 'video',
+    id: videoId,
+    title: 'Delete Video',
+    message: 'Are you sure you want to delete this video?',
+    description: 'This will remove the video from the database and download archive.',
+    toggleLabel: 'Also delete video file from disk',
+    warning: '⚠️ Warning: This will permanently delete the video file, metadata, and thumbnail from disk. This cannot be undone.',
+    confirmButtonText: 'Delete Video',
+    onConfirm: async (deleteFiles) => {
+      await api.delete(`/api/videos/${videoId}?deleteFiles=${deleteFiles}`);
+      showNotification('Video deleted successfully', 'success');
+    },
+    onClose: () => {
+      closeVideoModal();
+      loadHistory();
+      loadQueue();
+    }
+  });
 }
 
+// Legacy functions for compatibility
 function closeDeleteVideoModal() {
-  document.getElementById('delete-video-modal').style.display = 'none';
-  videoToDelete = null;
+  closeDeleteModal();
 }
 
 async function confirmDeleteVideo() {
-  if (!videoToDelete) return;
-
-  const deleteFiles = document.getElementById('delete-video-files-toggle').checked;
-
-  try {
-    await api.delete(`/api/videos/${videoToDelete}?deleteFiles=${deleteFiles}`);
-    showNotification('Video deleted successfully', 'success');
-    closeDeleteVideoModal();
-    closeVideoModal();
-    loadHistory();
-    loadQueue();
-  } catch (err) {
-    showNotification('Failed to delete video: ' + err.message, 'error');
-  }
+  await confirmDelete();
 }
 
 async function deleteVideo(videoId) {
@@ -938,34 +939,94 @@ async function saveChannelSettings(channelId, e) {
   }
 }
 
-// Delete Channel Modal
-let channelToDelete = null;
+// Generic Delete Modal System
+let deleteModalState = {
+  type: null, // 'channel', 'video', 'playlist-videos'
+  id: null,
+  config: null
+};
 
-function openDeleteChannelModal(channelId) {
-  channelToDelete = channelId;
-  document.getElementById('delete-channel-modal').style.display = 'flex';
-  document.getElementById('delete-files-toggle').checked = false;
+/**
+ * Opens a generic delete confirmation modal
+ * @param {Object} config - Modal configuration
+ * @param {string} config.type - Type of deletion ('channel', 'video', 'playlist-videos')
+ * @param {string|number} config.id - ID of item to delete
+ * @param {string} config.title - Modal title (e.g., "Delete Channel")
+ * @param {string} config.message - Main message (e.g., "Are you sure?")
+ * @param {string} config.description - Secondary description text
+ * @param {string} config.toggleLabel - Label for file deletion toggle
+ * @param {string} config.warning - Warning message text
+ * @param {string} config.confirmButtonText - Text for confirm button
+ * @param {Function} config.onConfirm - Async function to call on confirmation (receives deleteFiles boolean)
+ * @param {Function} [config.onClose] - Optional function to call after successful deletion
+ */
+function openDeleteModal(config) {
+  deleteModalState = { type: config.type, id: config.id, config };
+  
+  // Update modal content
+  document.getElementById('delete-modal-title').textContent = config.title;
+  document.getElementById('delete-modal-message').textContent = config.message;
+  document.getElementById('delete-modal-description').textContent = config.description;
+  document.getElementById('delete-modal-toggle-label').textContent = config.toggleLabel;
+  document.getElementById('delete-modal-warning').textContent = config.warning;
+  document.getElementById('delete-modal-confirm-btn').textContent = config.confirmButtonText;
+  
+  // Reset and show modal
+  document.getElementById('delete-modal-files-toggle').checked = false;
+  document.getElementById('delete-confirmation-modal').style.display = 'flex';
 }
 
+function closeDeleteModal() {
+  document.getElementById('delete-confirmation-modal').style.display = 'none';
+  deleteModalState = { type: null, id: null, config: null };
+}
+
+async function confirmDelete() {
+  if (!deleteModalState.config) return;
+  
+  const deleteFiles = document.getElementById('delete-modal-files-toggle').checked;
+  const config = deleteModalState.config;
+  
+  try {
+    await config.onConfirm(deleteFiles);
+    closeDeleteModal();
+    if (config.onClose) {
+      config.onClose();
+    }
+  } catch (err) {
+    showNotification(`Failed to delete: ${err.message}`, 'error');
+  }
+}
+
+// Delete Channel - now using generic modal
+function openDeleteChannelModal(channelId) {
+  openDeleteModal({
+    type: 'channel',
+    id: channelId,
+    title: 'Delete Channel',
+    message: 'Are you sure you want to delete this channel?',
+    description: 'This will remove the channel and all associated playlists from the database.',
+    toggleLabel: 'Also delete downloaded files',
+    warning: '⚠️ Warning: This will permanently delete all videos, metadata, and thumbnails for this channel from disk. This cannot be undone.',
+    confirmButtonText: 'Delete Channel',
+    onConfirm: async (deleteFiles) => {
+      await api.delete(`/api/channels/${channelId}?deleteFiles=${deleteFiles}`);
+      showNotification('Channel deleted successfully', 'success');
+    },
+    onClose: () => {
+      closeChannelModal();
+      loadChannelsPage();
+    }
+  });
+}
+
+// Legacy functions for compatibility
 function closeDeleteChannelModal() {
-  document.getElementById('delete-channel-modal').style.display = 'none';
-  channelToDelete = null;
+  closeDeleteModal();
 }
 
 async function confirmDeleteChannel() {
-  if (!channelToDelete) return;
-  
-  const deleteFiles = document.getElementById('delete-files-toggle').checked;
-  
-  try {
-    await api.delete(`/api/channels/${channelToDelete}?deleteFiles=${deleteFiles}`);
-    showNotification('Channel deleted successfully', 'success');
-    closeDeleteChannelModal();
-    closeChannelModal();
-    loadChannelsPage();
-  } catch (err) {
-    showNotification('Failed to delete channel: ' + err.message, 'error');
-  }
+  await confirmDelete();
 }
 
 function updateComputedOptions(channelId, channel) {
@@ -2064,40 +2125,44 @@ async function deleteAllPlaylistVideos(playlistId) {
   }
 }
 
-// Delete Playlist Videos Modal
-let playlistToDelete = null;
-
+// Delete Playlist Videos Modal - now using generic modal
 function openDeletePlaylistVideosModal(playlistId) {
-  playlistToDelete = playlistId;
-  document.getElementById('delete-playlist-videos-modal').style.display = 'flex';
-  document.getElementById('delete-playlist-files-toggle').checked = false;
+  openDeleteModal({
+    type: 'playlist-videos',
+    id: playlistId,
+    title: 'Delete All Playlist Videos',
+    message: 'Are you sure you want to delete ALL videos in this playlist?',
+    description: 'This will remove all videos from the database and download archive.',
+    toggleLabel: 'Also delete video files from disk',
+    warning: '⚠️ Warning: This will permanently delete all video files, metadata, thumbnails, and the playlist folder from disk. This cannot be undone.',
+    confirmButtonText: 'Delete All Videos',
+    onConfirm: async (deleteFiles) => {
+      const result = await api.delete(`/api/playlists/${playlistId}/videos?deleteFiles=${deleteFiles}`);
+      showNotification(`Deleted ${result.deleted_count} videos`, 'success');
+      return result;
+    },
+    onClose: () => {
+      closePlaylistModal();
+      loadStats();
+      // Refresh channel view if it's open
+      const channelModal = document.getElementById('channel-modal');
+      if (channelModal.style.display === 'flex') {
+        // We need to get channel ID from the result, but it's already handled in onConfirm
+        // For now, just refresh the current channel if modal is open
+        const channelId = document.querySelector('.channel-modal-content')?.dataset.channelId;
+        if (channelId) viewChannel(channelId);
+      }
+    }
+  });
 }
 
+// Legacy functions for compatibility
 function closeDeletePlaylistVideosModal() {
-  document.getElementById('delete-playlist-videos-modal').style.display = 'none';
-  playlistToDelete = null;
+  closeDeleteModal();
 }
 
 async function confirmDeletePlaylistVideos() {
-  if (!playlistToDelete) return;
-
-  const deleteFiles = document.getElementById('delete-playlist-files-toggle').checked;
-
-  try {
-    const result = await api.delete(`/api/playlists/${playlistToDelete}/videos?deleteFiles=${deleteFiles}`);
-    showNotification(`Deleted ${result.deleted_count} videos`, 'success');
-    closeDeletePlaylistVideosModal();
-    closePlaylistModal();
-    loadStats();
-    // Refresh channel view if it's open
-    const channelModal = document.getElementById('channel-modal');
-    if (channelModal.style.display === 'flex') {
-      const channelId = result.channel_id;
-      if (channelId) viewChannel(channelId);
-    }
-  } catch (err) {
-    showNotification('Failed to delete videos: ' + err.message, 'error');
-  }
+  await confirmDelete();
 }
 
 function closePlaylistModal() {

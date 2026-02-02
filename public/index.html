@@ -777,91 +777,31 @@
     </div>
   </div>
 
-  <!-- Delete Channel Confirmation Modal -->
-  <div id="delete-channel-modal" class="modal" style="display: none;">
+  <!-- Generic Delete Confirmation Modal (reusable template) -->
+  <div id="delete-confirmation-modal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
-        <h2>Delete Channel</h2>
-        <button class="close-btn" onclick="closeDeleteChannelModal()">&times;</button>
+        <h2 id="delete-modal-title">Confirm Deletion</h2>
+        <button class="close-btn" onclick="closeDeleteModal()">&times;</button>
       </div>
       <div class="modal-body">
-        <p>Are you sure you want to delete this channel?</p>
-        <p style="color: var(--text-muted); margin-top: 0.5rem;">This will remove the channel and all associated playlists from the database.</p>
+        <p id="delete-modal-message">Are you sure you want to delete this?</p>
+        <p id="delete-modal-description" style="color: var(--text-muted); margin-top: 0.5rem;"></p>
         
-        <div class="form-group" style="margin-top: 1.5rem; padding: 1rem; background: var(--surface-hover); border-radius: 8px;">
+        <div id="delete-modal-toggle-section" class="form-group" style="margin-top: 1.5rem; padding: 1rem; background: var(--surface-hover); border-radius: 8px;">
           <label>
             <div class="toggle-switch">
-              <input type="checkbox" id="delete-files-toggle">
+              <input type="checkbox" id="delete-modal-files-toggle">
               <span class="toggle-slider"></span>
             </div>
-            Also delete downloaded files
+            <span id="delete-modal-toggle-label">Also delete files from disk</span>
           </label>
-          <small style="display: block; margin-top: 0.5rem; color: var(--warning);">⚠️ Warning: This will permanently delete all videos, metadata, and thumbnails for this channel from disk. This cannot be undone.</small>
+          <small id="delete-modal-warning" style="display: block; margin-top: 0.5rem; color: var(--warning);">⚠️ Warning: This action cannot be undone.</small>
         </div>
         
         <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-          <button class="btn btn-secondary" onclick="closeDeleteChannelModal()">Cancel</button>
-          <button class="btn btn-danger" onclick="confirmDeleteChannel()">Delete Channel</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Delete Video Confirmation Modal -->
-  <div id="delete-video-modal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2>Delete Video</h2>
-        <button class="close-btn" onclick="closeDeleteVideoModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to delete this video?</p>
-        <p style="color: var(--text-muted); margin-top: 0.5rem;">This will remove the video from the database and download archive.</p>
-        
-        <div class="form-group" style="margin-top: 1.5rem; padding: 1rem; background: var(--surface-hover); border-radius: 8px;">
-          <label>
-            <div class="toggle-switch">
-              <input type="checkbox" id="delete-video-files-toggle">
-              <span class="toggle-slider"></span>
-            </div>
-            Also delete video file from disk
-          </label>
-          <small style="display: block; margin-top: 0.5rem; color: var(--warning);">⚠️ Warning: This will permanently delete the video file, metadata, and thumbnail from disk. This cannot be undone.</small>
-        </div>
-        
-        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-          <button class="btn btn-secondary" onclick="closeDeleteVideoModal()">Cancel</button>
-          <button class="btn btn-danger" onclick="confirmDeleteVideo()">Delete Video</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Delete Playlist Videos Confirmation Modal -->
-  <div id="delete-playlist-videos-modal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 500px;">
-      <div class="modal-header">
-        <h2>Delete All Playlist Videos</h2>
-        <button class="close-btn" onclick="closeDeletePlaylistVideosModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to delete ALL videos in this playlist?</p>
-        <p style="color: var(--text-muted); margin-top: 0.5rem;">This will remove all videos from the database and download archive.</p>
-        
-        <div class="form-group" style="margin-top: 1.5rem; padding: 1rem; background: var(--surface-hover); border-radius: 8px;">
-          <label>
-            <div class="toggle-switch">
-              <input type="checkbox" id="delete-playlist-files-toggle">
-              <span class="toggle-slider"></span>
-            </div>
-            Also delete video files from disk
-          </label>
-          <small style="display: block; margin-top: 0.5rem; color: var(--warning);">⚠️ Warning: This will permanently delete all video files, metadata, thumbnails, and the playlist folder from disk. This cannot be undone.</small>
-        </div>
-        
-        <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
-          <button class="btn btn-secondary" onclick="closeDeletePlaylistVideosModal()">Cancel</button>
-          <button class="btn btn-danger" onclick="confirmDeletePlaylistVideos()">Delete All Videos</button>
+          <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+          <button id="delete-modal-confirm-btn" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
         </div>
       </div>
     </div>
