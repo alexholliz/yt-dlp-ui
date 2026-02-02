@@ -1230,11 +1230,16 @@ These items need research or decisions before implementation:
 
 ### Performance Optimizations Needed
 
-1. Debounce auto-refresh polling
+1. ~~Debounce auto-refresh polling~~ ✅ **COMPLETED v1.4.0**
+   - Tracks user activity (clicks, keystrokes)
+   - Pauses polling for 2 seconds after user interaction
+   - Prevents excessive API calls during active navigation
+   - Only polls relevant data for current page
 2. Virtual scrolling for large video lists
 3. Lazy load thumbnails
 4. Cache stats calculations
-5. Optimize database queries with indexes
+5. ~~Optimize database queries with indexes~~ ✅ **Already Implemented**
+   - Indexes exist on: channels.url, playlists.channel_id, videos.channel_id, videos.playlist_id, videos.download_status
 
 ---
 

@@ -2222,15 +2222,36 @@ function nextQueuePage() {
   loadQueue();
 }
 
+// Debounced polling to avoid excessive API calls during user interaction
+let pollingTimer = null;
+let lastUserActivity = Date.now();
+
+function resetPollingTimer() {
+  lastUserActivity = Date.now();
+}
+
 function startPolling() {
+  // Track user activity to pause aggressive polling
+  document.addEventListener('click', resetPollingTimer);
+  document.addEventListener('keydown', resetPollingTimer);
+  
   setInterval(() => {
+    const timeSinceActivity = Date.now() - lastUserActivity;
     const activePage = document.querySelector('.page.active').id;
+    
+    // If user is actively interacting (activity in last 2 seconds), skip this poll
+    if (timeSinceActivity < 2000) {
+      return;
+    }
+    
+    // Only poll relevant data for the current page
     if (activePage === 'page-home') {
       loadStats();
       loadQueue();
     } else if (activePage === 'page-channels') {
       loadChannelsPage(); // Refresh to show enumeration progress
     }
+    // Don't poll on config or profiles pages (no dynamic data)
   }, 5000);
 }
 
