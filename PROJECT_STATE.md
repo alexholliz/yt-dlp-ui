@@ -987,17 +987,29 @@ open http://localhost:8189
 
 ### Planned Features (Not Yet Implemented)
 
-#### 🔄 In Progress
+#### 🎉 Recently Completed (Moved from Planned → Implemented)
 
-1. **Profile Integration with Downloads**
-   - Use profile settings in download-manager.js
-   - Apply output template from profile
-   - Apply format selection from profile
-   - Test end-to-end with channel downloads
+1. ~~**Profile Integration with Downloads**~~ ✅ **COMPLETED v1.4.0**
+   - ✅ Use profile settings in download-manager.js
+   - ✅ Apply output template from profile
+   - ✅ Apply format selection from profile
+   - ✅ Complete 4-level hierarchy system
+   - ✅ Profile toggles (verbose, filename format, output template)
+   - ✅ Smart conflict detection and preview
+
+6. ~~**Enhanced yt-dlp Options**~~ ✅ **COMPLETED v1.2.0-1.4.0**
+   - ✅ Subtitle download and embedding options (Channel toggles)
+   - ✅ Thumbnail download and embedding options (Channel toggles)
+   - ✅ Metadata download and embedding options (Channel toggles)
+   - ✅ SponsorBlock integration with 7 categories (v1.2.0)
+   - ✅ Per-channel configuration
+   - ✅ Modern toggle switch UI design
+   - ✅ All options independent: can select both, either, or neither
+   - ✅ Maps to yt-dlp flags correctly
 
 #### 🚀 High Priority Features
 
-2. **YouTube Authentication & Cookie Management** (Enhanced)
+1. **YouTube Authentication & Cookie Management** (Enhanced)
    - Cookie generation with YouTube login or API integration
    - Handles age-restricted and members-only content
    - Automatic cookie refresh/renewal
@@ -1005,14 +1017,14 @@ open http://localhost:8189
    - Solves "Sign in to confirm you're not a bot" issues
    - **NEW**: Cookies only applied to YouTube channels/videos (not other sites)
 
-3. **Plex Media Server Integration**
+2. **Plex Media Server Integration**
    - Add Plex connection settings to Config page
    - Configure Plex server URL and authentication token
    - Trigger library refresh after playlist/queue completion
    - Only trigger on full operations (not per-video)
    - Optional: specify which Plex library to refresh
 
-4. **Existing Content Import/Sync**
+3. **Existing Content Import/Sync**
    - Scan downloads folder for existing content
    - Parse folder structures to identify channels and playlists
    - Auto-create channel and playlist entries in database
@@ -1020,43 +1032,14 @@ open http://localhost:8189
    - Update download archive to prevent re-downloads
    - Handle partial imports gracefully
 
-5. **YouTube Shorts & Livestream Filtering**
+4. **YouTube Shorts & Livestream Filtering**
    - Add channel options to include/exclude shorts
    - Add channel options to include/exclude livestreams
    - **Default**: Exclude both shorts and livestreams
    - Use yt-dlp filters: `--match-filter "!is_live & duration > 60"`
    - Configurable per-channel
 
-6. **Enhanced yt-dlp Options**
-   - Subtitle download and embedding options
-   - Thumbnail download and embedding options
-   - Metadata download and embedding options
-   - Per-channel configuration
-   - **UI Design**: Toggle switches (not checkboxes)
-     - Grey oval with white circle (off state)
-     - Colored oval (e.g., blue/green) with white circle moved right (on state)
-     - Modern, intuitive on/off indication
-   - **Subtitles**:
-     - Toggle: "Download Subtitles" → writes .srt/.vtt files alongside video
-     - Toggle: "Embed Subtitles" → embeds subtitles in video container
-     - Toggle: "Include Auto-Generated Subtitles" → downloads auto-generated subs if manual ones unavailable
-       - Default: OFF
-       - Behavior: Prefers manual subtitles, falls back to auto-generated
-       - Maps to yt-dlp flag: `--write-auto-subs` (combined with `--write-subs`)
-     - Text input: "Subtitle Languages" → comma-delimited language codes
-       - Default value: `en`
-       - Example text: `e.g., en,de,es for English, German, Spanish`
-       - Maps to yt-dlp flag: `--sub-langs en,de,es`
-   - **Thumbnails**:
-     - Toggle: "Download Thumbnails" → writes .jpg/.png files alongside video
-     - Toggle: "Embed Thumbnails" → embeds thumbnail in video container
-   - **Metadata**:
-     - Toggle: "Download Metadata" → writes .info.json file alongside video
-     - Toggle: "Embed Metadata" → embeds metadata in video container
-   - All options independent: can select both, either, or neither
-   - Maps to yt-dlp flags: `--write-subs`, `--embed-subs`, `--write-thumbnail`, `--embed-thumbnail`, `--write-info-json`, `--embed-metadata`
-
-7. **SponsorBlock YouTube-Only Detection**
+5. **SponsorBlock YouTube-Only Detection**
    - SponsorBlock options only shown for YouTube channels
    - Grey out/disable for non-YouTube content
    - Display message: "SponsorBlock only supported for YouTube content"
