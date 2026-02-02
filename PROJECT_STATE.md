@@ -997,7 +997,7 @@ open http://localhost:8189
    - ✅ Profile toggles (verbose, filename format, output template)
    - ✅ Smart conflict detection and preview
 
-6. ~~**Enhanced yt-dlp Options**~~ ✅ **COMPLETED v1.2.0-1.4.0**
+2. ~~**Enhanced yt-dlp Options**~~ ✅ **COMPLETED v1.2.0-1.4.0**
    - ✅ Subtitle download and embedding options (Channel toggles)
    - ✅ Thumbnail download and embedding options (Channel toggles)
    - ✅ Metadata download and embedding options (Channel toggles)
@@ -1006,6 +1006,37 @@ open http://localhost:8189
    - ✅ Modern toggle switch UI design
    - ✅ All options independent: can select both, either, or neither
    - ✅ Maps to yt-dlp flags correctly
+
+3. ~~**Browser Refresh State Preservation**~~ ✅ **COMPLETED v1.3.0**
+   - ✅ Save current page/view in localStorage
+   - ✅ Restore user to same page after browser refresh
+   - ✅ Automatically clicks saved page element to restore state
+   - ✅ Improves user experience during active session
+   - Commit: b5cf68d (2026-01-31)
+
+4. ~~**YouTube API Quota Tracker Improvements**~~ ✅ **COMPLETED v1.3.0**
+   - ✅ Only display quota tracker when API key is configured
+   - ✅ Shows helper text when no key: "Add an API key above to see quota information"
+   - ✅ Colored progress bar (green/yellow/red) for visual quota tracking
+   - ✅ Number formatting with toLocaleString()
+   - ✅ Prevents showing 0/10000 when no key configured
+   - Commit: 20c68a3 (2026-01-31)
+
+5. ~~**Pipeline Readability in GitHub Actions**~~ ✅ **COMPLETED v1.3.0**
+   - ✅ Break out test steps into individual named steps
+   - ✅ Clear step names in Actions UI (Install dependencies, Run unit tests, Build production image, Test server startup, Verify server health, Cleanup test server)
+   - ✅ Easy to identify which specific test failed
+   - ✅ Better progress visibility
+   - Commit: f13ef6d (2026-01-31)
+
+6. ~~**AI Agent Instructions File**~~ ✅ **COMPLETED v1.3.0**
+   - ✅ Created `.copilot-instructions.md` file
+   - ✅ Session start/end checklists
+   - ✅ File update rules matrix
+   - ✅ Git configuration guidance
+   - ✅ Technical constraints documented
+   - ✅ Platform-agnostic paths
+   - Commit: 13eaebe (2026-01-31)
 
 #### 🚀 High Priority Features
 
@@ -1067,7 +1098,7 @@ open http://localhost:8189
 
 #### 🏗️ DevOps & Infrastructure
 
-11. **Stable & Dev Branch Strategy**
+6. **Stable & Dev Branch Strategy**
     - **Dev branch** (currently main): Latest development work
     - **Stable branch**: Latest release version
     - Container tags: `latest` (dev), `stable`, `v1.x.x`
@@ -1075,26 +1106,19 @@ open http://localhost:8189
     - Admin can bypass PR requirement on dev branch
     - Releases tagged and pushed to stable branch
 
-12. **Test Pipeline Separation**
+7. **Test Pipeline Separation**
     - **Dev pipeline**: Fast unit tests only (35 tests)
     - **Stable pipeline**: Full test suite including integration
     - Full suite includes real SponsorBlock video test
     - Full suite requires YouTube credentials/cookies/API key
     - Pass credentials securely via GitHub Secrets
 
-13. **Documentation File Management**
+8. **Documentation File Management**
     - Mark planning .MD files as repo-owner only
     - Use `.git/info/exclude` or `.gitignore` with force-add
     - Files sync to repo but hidden from forks/clones
     - Keeps project state visible to AI across machines
     - **Question**: Best approach for this use case?
-
-14. **AI Agent Instructions File**
-    - Create `.copilot-instructions.md` or similar
-    - Read automatically by AI agents for every query
-    - Contains: query handling structure, assumptions, conventions
-    - Similar to PROJECT_STATE.md but specifically for AI behavior
-    - **Question**: What's the best practice for this?
 
 #### 🔒 Security & Infrastructure
 
@@ -1295,3 +1319,5 @@ These items need research or decisions before implementation:
 ---
 
 *This document serves as a complete snapshot of the project state and should be updated whenever major features are added or architectural decisions are made.*
+
+
