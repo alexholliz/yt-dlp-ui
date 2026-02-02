@@ -18,6 +18,18 @@ const api = {
     const res = await fetch(url, { method: 'DELETE' });
     if (!res.ok) throw new Error((await res.json()).error || 'Request failed');
     return res.json();
+  },
+  
+  // Error handling wrapper - reduces try-catch boilerplate
+  async withNotification(apiCall, successMsg, errorPrefix = 'Operation failed') {
+    try {
+      const result = await apiCall();
+      if (successMsg) showNotification(successMsg, 'success');
+      return result;
+    } catch (err) {
+      showNotification(`${errorPrefix}: ${err.message}`, 'error');
+      throw err; // Re-throw for caller to handle if needed
+    }
   }
 };
 
@@ -1690,12 +1702,11 @@ function updateComputedOptions(channelId, channel) {
 }
 
 async function togglePlaylist(playlistId, enabled) {
-  try {
-    await api.put(`/api/playlists/${playlistId}`, { enabled });
-    showNotification(`Playlist ${enabled ? 'enabled' : 'disabled'}`, 'success');
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.put(`/api/playlists/${playlistId}`, { enabled }),
+    `Playlist ${enabled ? 'enabled' : 'disabled'}`,
+    'Failed to toggle playlist'
+  );
 }
 
 async function toggleChannel(channelId, enabled) {
@@ -1715,23 +1726,23 @@ async function toggleChannel(channelId, enabled) {
 
 async function downloadChannel(channelId) {
   if (!confirm('Download all enabled playlists from this channel?')) return;
-  try {
-    const result = await api.post(`/api/channels/${channelId}/download`);
-    showNotification(`Queued ${result.queued} videos`, 'success');
-    loadQueue();
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  const result = await api.withNotification(
+    () => api.post(`/api/channels/${channelId}/download`),
+    null, // Will show custom success message
+    'Failed to queue downloads'
+  );
+  showNotification(`Queued ${result.queued} videos`, 'success');
+  loadQueue();
 }
 
 async function downloadPlaylist(playlistId) {
-  try {
-    const result = await api.post(`/api/playlists/${playlistId}/download`);
-    showNotification(`Queued ${result.queued} videos`, 'success');
-    loadQueue();
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  const result = await api.withNotification(
+    () => api.post(`/api/playlists/${playlistId}/download`),
+    null,
+    'Failed to queue downloads'
+  );
+  showNotification(`Queued ${result.queued} videos`, 'success');
+  loadQueue();
 }
 
 async function loadSchedulerStatus() {
@@ -1745,57 +1756,52 @@ async function loadSchedulerStatus() {
 }
 
 async function startDownloads() {
-  try {
-    await api.post('/api/download/start');
-    showNotification('Downloads started', 'success');
-    loadQueue();
-  } catch (err) {
-    showNotification('Failed to start downloads: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.post('/api/download/start'),
+    'Downloads started',
+    'Failed to start downloads'
+  );
+  loadQueue();
 }
 
 async function retryFailedDownloads() {
   if (!confirm('Retry all failed downloads?')) return;
   
-  try {
-    await api.post('/api/download/retry-failed');
-    showNotification('Failed downloads queued for retry', 'success');
-    loadQueue();
-  } catch (err) {
-    showNotification('Failed to retry downloads: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.post('/api/download/retry-failed'),
+    'Failed downloads queued for retry',
+    'Failed to retry downloads'
+  );
+  loadQueue();
 }
 
 async function refreshPlaylist(playlistId, channelId) {
-  try {
-    const result = await api.post(`/api/playlists/${playlistId}/enumerate`);
-    showNotification(`Updated: ${result.video_count} videos found`, 'success');
-    // Refresh the channel modal to show updated count
-    viewChannel(channelId);
-  } catch (err) {
-    showNotification('Failed to refresh playlist: ' + err.message, 'error');
-  }
+  const result = await api.withNotification(
+    () => api.post(`/api/playlists/${playlistId}/enumerate`),
+    null,
+    'Failed to refresh playlist'
+  );
+  showNotification(`Updated: ${result.video_count} videos found`, 'success');
+  viewChannel(channelId);
 }
 
 async function startScheduler() {
   const days = parseInt(document.getElementById('scheduler-interval').value);
-  try {
-    await api.post('/api/scheduler/start', { intervalDays: days });
-    showNotification('Scheduler started', 'success');
-    loadSchedulerStatus();
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.post('/api/scheduler/start', { intervalDays: days }),
+    'Scheduler started',
+    'Failed to start scheduler'
+  );
+  loadSchedulerStatus();
 }
 
 async function stopScheduler() {
-  try {
-    await api.post('/api/scheduler/stop');
-    showNotification('Scheduler stopped', 'success');
-    loadSchedulerStatus();
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.post('/api/scheduler/stop'),
+    'Scheduler stopped',
+    'Failed to stop scheduler'
+  );
+  loadSchedulerStatus();
 }
 
 async function loadCookies() {
@@ -1851,13 +1857,12 @@ async function testCookies() {
 
 async function deleteCookies() {
   if (!confirm('Delete cookie file?')) return;
-  try {
-    await api.delete('/api/cookies');
-    document.getElementById('cookies-content').value = '';
-    showNotification('Cookies deleted', 'success');
-  } catch (err) {
-    showNotification('Failed: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.delete('/api/cookies'),
+    'Cookies deleted',
+    'Failed to delete cookies'
+  );
+  document.getElementById('cookies-content').value = '';
 }
 
 // YouTube API Key Management
@@ -1919,14 +1924,13 @@ async function deleteYouTubeApiKey() {
     return;
   }
   
-  try {
-    await api.delete('/api/youtube-api/key');
-    document.getElementById('youtube-api-key').value = '';
-    document.getElementById('youtube-api-quota-status').innerHTML = '';
-    showNotification('YouTube API key deleted', 'success');
-  } catch (err) {
-    showNotification('Failed to delete API key: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.delete('/api/youtube-api/key'),
+    'YouTube API key deleted',
+    'Failed to delete API key'
+  );
+  document.getElementById('youtube-api-key').value = '';
+  document.getElementById('youtube-api-quota-status').innerHTML = '';
 }
 
 async function loadYouTubeApiQuota() {
@@ -2016,21 +2020,19 @@ async function loadConfigPage() {
 }
 
 async function saveLogConfig() {
-  try {
-    const logLevel = document.getElementById('log-level').value;
-    const logMaxSize = document.getElementById('log-max-size').value;
-    const logMaxFiles = document.getElementById('log-max-files').value;
-    
-    await api.put('/api/config', {
+  const logLevel = document.getElementById('log-level').value;
+  const logMaxSize = document.getElementById('log-max-size').value;
+  const logMaxFiles = document.getElementById('log-max-files').value;
+  
+  await api.withNotification(
+    () => api.put('/api/config', {
       log_level: logLevel,
       log_max_size_kb: logMaxSize,
       log_max_files: logMaxFiles
-    });
-    
-    showNotification('Log configuration saved successfully. Rotation settings will apply after restart.', 'success');
-  } catch (err) {
-    showNotification('Failed to save log configuration: ' + err.message, 'error');
-  }
+    }),
+    'Log configuration saved successfully. Rotation settings will apply after restart.',
+    'Failed to save log configuration'
+  );
 }
 
 function showAddChannelModal() {
@@ -2205,26 +2207,24 @@ async function handleAddProfile(e) {
     additional_args: document.getElementById('profile-additional-args').value.trim() || null
   };
   
-  try {
-    await api.post('/api/profiles', profileData);
-    showNotification('Profile created successfully', 'success');
-    closeAddProfileModal();
-    loadProfilesPage();
-  } catch (err) {
-    showNotification('Failed to create profile: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.post('/api/profiles', profileData),
+    'Profile created successfully',
+    'Failed to create profile'
+  );
+  closeAddProfileModal();
+  loadProfilesPage();
 }
 
 async function deleteProfile(profileId) {
   if (!confirm('Delete this profile? Channels using this profile will revert to custom options.')) return;
   
-  try {
-    await api.delete(`/api/profiles/${profileId}`);
-    showNotification('Profile deleted', 'success');
-    loadProfilesPage();
-  } catch (err) {
-    showNotification('Failed to delete profile: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.delete(`/api/profiles/${profileId}`),
+    'Profile deleted',
+    'Failed to delete profile'
+  );
+  loadProfilesPage();
 }
 
 async function editProfile(profileId) {
@@ -2279,15 +2279,14 @@ async function handleEditProfile(e) {
     additional_args: document.getElementById('edit-profile-additional-args').value.trim() || null
   };
   
-  try {
-    await api.put(`/api/profiles/${profileId}`, profileData);
-    showNotification('Profile updated successfully', 'success');
-    closeEditProfileModal();
-    loadProfilesPage();
-    loadProfilesIntoDropdowns(); // Refresh dropdowns in case name changed
-  } catch (err) {
-    showNotification('Failed to update profile: ' + err.message, 'error');
-  }
+  await api.withNotification(
+    () => api.put(`/api/profiles/${profileId}`, profileData),
+    'Profile updated successfully',
+    'Failed to update profile'
+  );
+  closeEditProfileModal();
+  loadProfilesPage();
+  loadProfilesIntoDropdowns(); // Refresh dropdowns in case name changed
 }
 
 async function loadProfilesIntoDropdowns() {
