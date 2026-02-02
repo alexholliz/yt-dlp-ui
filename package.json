@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test test/database.test.js test/sponsorblock.test.js test/api-endpoints.test.js",
+    "test": "node --test test/database.test.js test/sponsorblock.test.js test/api-endpoints.test.js test/performance.test.js",
     "test:integration": "node --test test/sponsorblock-integration.test.js",
     "test:auth": "node --test test/http-auth.test.js",
     "test:all": "node --test test/*.test.js",
