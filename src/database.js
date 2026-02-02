@@ -7,6 +7,24 @@ class DB {
     this.dbPath = dbPath;
     this.db = null;
     this.ready = this.init();
+    
+    // Simple stats cache with TTL
+    this.statsCache = {
+      data: null,
+      timestamp: 0,
+      ttl: 3000 // 3 seconds TTL
+    };
+    this.channelStatsCache = {
+      data: null,
+      timestamp: 0,
+      ttl: 3000 // 3 seconds TTL
+    };
+  }
+  
+  // Invalidate caches when data changes
+  invalidateStatsCache() {
+    this.statsCache.timestamp = 0;
+    this.channelStatsCache.timestamp = 0;
   }
 
   async init() {
@@ -384,6 +402,7 @@ class DB {
     ]);
     const result = this.db.exec('SELECT last_insert_rowid() as id');
     this.save();
+    this.invalidateStatsCache(); // Invalidate cache on data change
     return result[0].values[0][0];
   }
 
@@ -496,6 +515,7 @@ class DB {
   deleteChannel(id) {
     this.db.run('DELETE FROM channels WHERE id = ?', [id]);
     this.save();
+    this.invalidateStatsCache(); // Invalidate cache on data change
   }
 
   // Playlists
@@ -597,6 +617,7 @@ class DB {
       WHERE video_id = ?
     `, [status, filePath, downloadedAt, fileSize, errorMessage, videoId]);
     this.save();
+    this.invalidateStatsCache(); // Invalidate cache on data change
   }
 
   updateVideoMetadata(videoId, metadata) {
@@ -625,6 +646,13 @@ class DB {
 
   // Statistics
   getStats() {
+    // Check cache first
+    const now = Date.now();
+    if (this.statsCache.data && (now - this.statsCache.timestamp) < this.statsCache.ttl) {
+      return this.statsCache.data;
+    }
+    
+    // Cache miss or expired - recalculate
     const channelCount = this.db.exec('SELECT COUNT(*) as count FROM channels');
     const totalDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'completed'");
     const pendingDownloads = this.db.exec("SELECT COUNT(*) as count FROM videos WHERE download_status = 'pending'");
@@ -632,12 +660,18 @@ class DB {
     
     const librarySize = librarySizeResult[0]?.values[0]?.[0] || 0;
     
-    return {
+    const stats = {
       channel_count: channelCount[0]?.values[0]?.[0] || 0,
       total_downloads: totalDownloads[0]?.values[0]?.[0] || 0,
       pending_downloads: pendingDownloads[0]?.values[0]?.[0] || 0,
       library_size: librarySize
     };
+    
+    // Update cache
+    this.statsCache.data = stats;
+    this.statsCache.timestamp = now;
+    
+    return stats;
   }
 
   getRecentDownloads(limit = 5, offset = 0, status = null) {
@@ -666,6 +700,13 @@ class DB {
   }
 
   getChannelStats() {
+    // Check cache first
+    const now = Date.now();
+    if (this.channelStatsCache.data && (now - this.channelStatsCache.timestamp) < this.channelStatsCache.ttl) {
+      return this.channelStatsCache.data;
+    }
+    
+    // Cache miss or expired - recalculate
     const result = this.db.exec(`
       SELECT 
         c.id,
@@ -684,8 +725,13 @@ class DB {
       ORDER BY c.channel_name
     `);
     
-    if (result.length === 0) return [];
-    return result[0].values.map(row => this.rowToObject(result[0].columns, row));
+    const stats = result.length === 0 ? [] : result[0].values.map(row => this.rowToObject(result[0].columns, row));
+    
+    // Update cache
+    this.channelStatsCache.data = stats;
+    this.channelStatsCache.timestamp = now;
+    
+    return stats;
   }
 
   rowToObject(columns, values) {

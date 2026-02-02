@@ -539,6 +539,7 @@ db.ready.then(() => {
       // Delete from database
       db.db.run('DELETE FROM videos WHERE playlist_id = ?', [req.params.id]);
       db.save();
+      db.invalidateStatsCache(); // Invalidate cache on data change
 
       logger.info(`Deleted ${videos.length} videos from playlist ${playlist.playlist_title}`);
       res.json({ 
@@ -619,6 +620,7 @@ db.ready.then(() => {
       // Delete from database
       db.db.run('DELETE FROM videos WHERE video_id = ?', [req.params.id]);
       db.save();
+      db.invalidateStatsCache(); // Invalidate cache on data change
       
       res.json({ success: true, message: 'Video and files deleted' });
     } catch (err) {

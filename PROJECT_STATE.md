@@ -1237,7 +1237,11 @@ These items need research or decisions before implementation:
    - Only polls relevant data for current page
 2. Virtual scrolling for large video lists
 3. Lazy load thumbnails
-4. Cache stats calculations
+4. ~~Cache stats calculations~~ ✅ **COMPLETED v1.4.0**
+   - 3-second TTL cache for getStats() and getChannelStats()
+   - Automatic invalidation on data changes (add/delete/update)
+   - Reduces database queries from every 5 seconds to every 3+ seconds
+   - Cache hit returns instant results, no database query
 5. ~~Optimize database queries with indexes~~ ✅ **Already Implemented**
    - Indexes exist on: channels.url, playlists.channel_id, videos.channel_id, videos.playlist_id, videos.download_status
 
