@@ -607,11 +607,11 @@ async function viewChannel(channelId) {
           
           <!-- Computed Options Display -->
           <div class="content-box" style="margin: 1rem 0; background: var(--surface-hover);">
-            <h4 style="margin-bottom: 0.5rem;">Final yt-dlp Options for This Channel</h4>
+            <h4 style="margin-bottom: 0.5rem;">yt-dlp Command Used for This Channel</h4>
             <div id="computed-options-${channelId}" style="font-family: monospace; font-size: 0.85rem; color: var(--text-muted); padding: 0.75rem; background: var(--background); border-radius: 4px; word-wrap: break-word; white-space: pre-wrap;">
               Loading...
             </div>
-            <small style="display: block; margin-top: 0.5rem;">This shows the actual flags that will be used when downloading.</small>
+            <small style="display: block; margin-top: 0.5rem;">This is the exact yt-dlp command that will be executed when downloading videos.</small>
             
             <!-- Options Breakdown by Source -->
             <div id="options-breakdown-${channelId}" style="margin-top: 1rem; padding: 0.75rem; background: var(--background); border-radius: 4px; font-size: 0.85rem;">
@@ -971,27 +971,7 @@ function updateComputedOptions(channelId, channel) {
       
       // NEW HIERARCHY: Toggles > Custom > Profile
       
-      // 1. Format selection (from profile or default)
-      const format = profile?.format_selection || 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best';
-      const formatArg = `-f "${format}"`;
-      allArgs.push(formatArg);
-      breakdown.push({
-        icon: profile ? '🎯' : '⚙️',
-        source: profile ? 'yt-dlp Profile (format)' : 'Default Format',
-        flags: formatArg
-      });
-      
-      // 2. Merge output format (from profile or default)
-      const mergeFormat = profile?.merge_output_format || 'mp4';
-      const mergeArg = `--merge-output-format ${mergeFormat}`;
-      allArgs.push(mergeArg);
-      breakdown.push({
-        icon: profile ? '🎯' : '⚙️',
-        source: profile ? 'yt-dlp Profile (merge)' : 'Default Merge Format',
-        flags: mergeArg
-      });
-      
-      // 3. Collect toggle flags (highest priority)
+      // 1. Collect toggle flags (highest priority)
       const toggleFlags = [];
       const metadataFlags = [];
       const thumbnailFlags = [];
@@ -1164,8 +1144,20 @@ function updateComputedOptions(channelId, channel) {
               });
             }
           } else {
-            customFiltered.push(arg);
-            allArgs.push(arg);
+            // Not filtered - add to results
+            // Add the full argument (flag + value if present)
+            if (valueTokens.length > 0) {
+              // Skip ahead past all the value tokens
+              i = originalI + valueTokens.length;
+              // Add the complete argument to customFiltered and allArgs
+              customFiltered.push(fullCustomArg);
+              allArgs.push(fullCustomArg);
+            } else {
+              // No value, just add the flag
+              customFiltered.push(arg);
+              allArgs.push(arg);
+            }
+            
             // Track custom flag for filtering profile
             if (argWithoutValue.startsWith('-')) {
               customFlags.push(argWithoutValue);
@@ -1181,66 +1173,193 @@ function updateComputedOptions(channelId, channel) {
         });
       }
       
-      // 6. Filter and add profile additional args (filter by toggles AND custom, track conflicts)
-      const profileFiltered = [];
-      if (profile && profile.additional_args) {
-        const profileArgsParsed = profile.additional_args.split(/\s+/);
+      // 6. Add and filter profile toggles (format_selection, merge_output_format, verbose, filename_format)
+      // These are filtered by channel toggles + channel custom
+      const profileToggleFlags = [];
+      const profileToggleArgsMap = new Map();
+      const profileToggleFiltered = [];
+      const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+      
+      if (profile) {
         const filterList = [...toggleFlags, ...customFlags];
+        const customHasFilesystemFlag = customFlags.some(flag => filesystemOptions.includes(flag));
         
-        for (let i = 0; i < profileArgsParsed.length; i++) {
-          const arg = profileArgsParsed[i];
+        // Profile output_template
+        if (profile.output_template) {
+          const outputFlag = `-o "${profile.output_template}"`;
+          if (!filterList.includes('-o') && !filterList.includes('--output')) {
+            profileToggleFiltered.push(outputFlag);
+            profileToggleFlags.push('-o');
+            profileToggleArgsMap.set('-o', outputFlag);
+          } else {
+            // Filtered - detect conflict
+            if (customFlags.includes('-o') || customFlags.includes('--output')) {
+              const customArg = customArgsMap.get('-o') || customArgsMap.get('--output') || '-o';
+              conflicts.push({
+                winnerIcon: '✏️',
+                winnerSource: `${channelName} custom yt-dlp options`,
+                winnerFlag: customArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} (output template)`,
+                loserFlag: outputFlag
+              });
+            }
+          }
+        }
+        
+        // Profile format_selection
+        if (profile.format_selection) {
+          const formatFlag = `-f "${profile.format_selection}"`;
+          if (!filterList.includes('-f')) {
+            profileToggleFiltered.push(formatFlag);
+            profileToggleFlags.push('-f');
+            profileToggleArgsMap.set('-f', formatFlag);
+          } else {
+            // Filtered - detect conflict
+            if (customFlags.includes('-f')) {
+              const customArg = customArgsMap.get('-f') || '-f';
+              conflicts.push({
+                winnerIcon: '✏️',
+                winnerSource: `${channelName} custom yt-dlp options`,
+                winnerFlag: customArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} (format selection)`,
+                loserFlag: formatFlag
+              });
+            }
+          }
+        }
+        
+        // Profile merge_output_format
+        if (profile.merge_output_format) {
+          const mergeFlag = `--merge-output-format ${profile.merge_output_format}`;
+          if (!filterList.includes('--merge-output-format')) {
+            profileToggleFiltered.push(mergeFlag);
+            profileToggleFlags.push('--merge-output-format');
+            profileToggleArgsMap.set('--merge-output-format', mergeFlag);
+          } else {
+            // Filtered - detect conflict
+            if (customFlags.includes('--merge-output-format')) {
+              const customArg = customArgsMap.get('--merge-output-format') || '--merge-output-format';
+              conflicts.push({
+                winnerIcon: '✏️',
+                winnerSource: `${channelName} custom yt-dlp options`,
+                winnerFlag: customArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} (merge output format)`,
+                loserFlag: mergeFlag
+              });
+            }
+          }
+        }
+        
+        // Profile verbose
+        if (profile.verbose) {
+          if (!filterList.includes('-v')) {
+            profileToggleFiltered.push('-v');
+            profileToggleFlags.push('-v');
+            profileToggleArgsMap.set('-v', '-v');
+          } else {
+            // Filtered - detect conflict
+            if (customFlags.includes('-v')) {
+              const customArg = customArgsMap.get('-v') || '-v';
+              conflicts.push({
+                winnerIcon: '✏️',
+                winnerSource: `${channelName} custom yt-dlp options`,
+                winnerFlag: customArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} (verbose)`,
+                loserFlag: '-v'
+              });
+            }
+          }
+        }
+        
+        // Profile filename_format (only if no filesystem flag in custom)
+        if (profile.filename_format) {
+          if (!customHasFilesystemFlag && !filesystemOptions.some(opt => filterList.includes(opt))) {
+            profileToggleFiltered.push(profile.filename_format);
+            profileToggleFlags.push(profile.filename_format);
+            profileToggleArgsMap.set(profile.filename_format, profile.filename_format);
+          } else if (customHasFilesystemFlag) {
+            // Filtered by custom filesystem flag - detect conflict
+            const customFilesystemFlag = customFlags.find(flag => filesystemOptions.includes(flag));
+            const customArg = customArgsMap.get(customFilesystemFlag) || customFilesystemFlag;
+            conflicts.push({
+              winnerIcon: '✏️',
+              winnerSource: `${channelName} custom yt-dlp options`,
+              winnerFlag: customArg,
+              loserIcon: '🎯',
+              loserSource: `${profileName} (filename format)`,
+              loserFlag: profile.filename_format
+            });
+          }
+        }
+        
+        // Add profile toggles to allArgs
+        profileToggleFiltered.forEach(arg => allArgs.push(arg));
+      }
+      
+      // 7. Filter and add profile additional args (filter by channel toggles + channel custom + profile toggles)
+      const profileAdditionalFiltered = [];
+      
+      if (profile && profile.additional_args) {
+        const filterList = [...toggleFlags, ...customFlags, ...profileToggleFlags];
+        const higherHasFilesystemFlag = customFlags.some(flag => filesystemOptions.includes(flag)) || 
+                                         profileToggleFlags.some(flag => filesystemOptions.includes(flag));
+        const additionalArgsParsed = profile.additional_args.split(/\s+/);
+        
+        for (let i = 0; i < additionalArgsParsed.length; i++) {
+          const arg = additionalArgsParsed[i];
           const argWithoutValue = arg.split('=')[0];
           
-          if (filterList.includes(argWithoutValue)) {
-            // Collect full profile argument for conflict detection
+          // Check if this should be filtered
+          const shouldFilter = filterList.includes(argWithoutValue) || 
+                               (higherHasFilesystemFlag && filesystemOptions.includes(argWithoutValue));
+          
+          if (shouldFilter) {
+            // Build full argument for conflict detection
             let fullProfileArg = arg;
             let valueTokens = [];
             
-            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
-              const nextToken = profileArgsParsed[i + 1];
+            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < additionalArgsParsed.length) {
+              const nextToken = additionalArgsParsed[i + 1];
               if (!nextToken.startsWith('-')) {
                 i++;
                 valueTokens.push(nextToken);
                 if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
-                  while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
+                  while (i + 1 < additionalArgsParsed.length && !additionalArgsParsed[i].endsWith('"')) {
                     i++;
-                    valueTokens.push(profileArgsParsed[i]);
+                    valueTokens.push(additionalArgsParsed[i]);
                   }
                 }
                 fullProfileArg = `${arg} ${valueTokens.join(' ')}`;
               }
             }
             
-            // Determine what's overriding this profile option
+            // Determine what's overriding this profile additional arg
             if (toggleFlags.includes(argWithoutValue)) {
-              // Toggle is overriding profile
+              // Channel toggle is overriding
               let overrideSource = '';
               let overrideFlag = argWithoutValue;
               
               if (downloadMetadata && argWithoutValue === '--write-info-json') {
                 overrideSource = 'Metadata Toggle (download)';
-                overrideFlag = '--write-info-json';
               } else if (embedMetadata && argWithoutValue === '--embed-metadata') {
                 overrideSource = 'Metadata Toggle (embed)';
-                overrideFlag = '--embed-metadata';
               } else if (downloadThumbnail && argWithoutValue === '--write-thumbnail') {
                 overrideSource = 'Thumbnail Toggle (download)';
-                overrideFlag = '--write-thumbnail';
               } else if (embedThumbnail && argWithoutValue === '--embed-thumbnail') {
                 overrideSource = 'Thumbnail Toggle (embed)';
-                overrideFlag = '--embed-thumbnail';
               } else if ((downloadSubtitles || embedSubtitles) && (argWithoutValue === '--sub-lang' || argWithoutValue === '--sub-langs')) {
                 overrideSource = 'Subtitle Toggle (language)';
                 overrideFlag = `--sub-langs ${subtitleLanguages || 'en'}`;
               } else if (downloadSubtitles && (argWithoutValue === '--write-subs' || argWithoutValue === '--write-subtitles')) {
                 overrideSource = 'Subtitle Toggle (download)';
-                overrideFlag = '--write-subs';
               } else if (embedSubtitles && (argWithoutValue === '--embed-subs' || argWithoutValue === '--embed-subtitles')) {
                 overrideSource = 'Subtitle Toggle (embed)';
-                overrideFlag = '--embed-subs';
               } else if (autoSubtitles && (argWithoutValue === '--write-auto-subs' || argWithoutValue === '--write-automatic-subs')) {
                 overrideSource = 'Subtitle Toggle (auto)';
-                overrideFlag = '--write-auto-subs';
               }
               
               if (overrideSource) {
@@ -1249,38 +1368,155 @@ function updateComputedOptions(channelId, channel) {
                   winnerSource: overrideSource,
                   winnerFlag: overrideFlag,
                   loserIcon: '🎯',
-                  loserSource: `${profileName} custom yt-dlp options`,
+                  loserSource: `${profileName} (additional)`,
                   loserFlag: fullProfileArg
                 });
               }
             } else if (customFlags.includes(argWithoutValue)) {
-              // Custom is overriding profile
+              // Channel custom is overriding
               const customArg = customArgsMap.get(argWithoutValue) || argWithoutValue;
               conflicts.push({
                 winnerIcon: '✏️',
                 winnerSource: `${channelName} custom yt-dlp options`,
                 winnerFlag: customArg,
                 loserIcon: '🎯',
-                loserSource: `${profileName} custom yt-dlp options`,
+                loserSource: `${profileName} (additional)`,
                 loserFlag: fullProfileArg
               });
+            } else if (profileToggleFlags.includes(argWithoutValue)) {
+              // Profile toggle is overriding profile additional
+              const profileToggleArg = profileToggleArgsMap.get(argWithoutValue) || argWithoutValue;
+              conflicts.push({
+                winnerIcon: '🎯',
+                winnerSource: `${profileName} (toggle)`,
+                winnerFlag: profileToggleArg,
+                loserIcon: '🎯',
+                loserSource: `${profileName} (additional)`,
+                loserFlag: fullProfileArg
+              });
+            } else if (higherHasFilesystemFlag && filesystemOptions.includes(argWithoutValue)) {
+              // A higher-priority filesystem flag overrides this one
+              let overrideFlag = '';
+              let overrideSource = '';
+              
+              if (customFlags.some(flag => filesystemOptions.includes(flag))) {
+                const customFilesystemFlag = customFlags.find(flag => filesystemOptions.includes(flag));
+                overrideFlag = customArgsMap.get(customFilesystemFlag) || customFilesystemFlag;
+                overrideSource = `${channelName} custom yt-dlp options`;
+              } else if (profileToggleFlags.some(flag => filesystemOptions.includes(flag))) {
+                const profileFilesystemFlag = profileToggleFlags.find(flag => filesystemOptions.includes(flag));
+                overrideFlag = profileToggleArgsMap.get(profileFilesystemFlag) || profileFilesystemFlag;
+                overrideSource = `${profileName} (filename format)`;
+              }
+              
+              if (overrideSource) {
+                conflicts.push({
+                  winnerIcon: overrideSource.includes('custom') ? '✏️' : '🎯',
+                  winnerSource: overrideSource,
+                  winnerFlag: overrideFlag,
+                  loserIcon: '🎯',
+                  loserSource: `${profileName} (additional)`,
+                  loserFlag: fullProfileArg
+                });
+              }
             }
           } else {
-            profileFiltered.push(arg);
-            allArgs.push(arg);
+            // Not filtered - add to results
+            let fullArg = arg;
+            let valueTokens = [];
+            
+            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < additionalArgsParsed.length) {
+              const nextToken = additionalArgsParsed[i + 1];
+              if (!nextToken.startsWith('-')) {
+                i++;
+                valueTokens.push(nextToken);
+                if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                  while (i + 1 < additionalArgsParsed.length && !additionalArgsParsed[i].endsWith('"')) {
+                    i++;
+                    valueTokens.push(additionalArgsParsed[i]);
+                  }
+                }
+                fullArg = `${arg} ${valueTokens.join(' ')}`;
+              }
+            }
+            
+            profileAdditionalFiltered.push(fullArg);
+            allArgs.push(fullArg);
           }
         }
       }
-      if (profileFiltered.length > 0) {
+      
+      // 8. Add breakdown displays for profile toggles and additional args
+      if (profile && profile.output_template && profileToggleFiltered.some(a => a.includes(profile.output_template))) {
         breakdown.push({
           icon: '🎯',
-          source: 'yt-dlp Profile (additional)',
-          flags: profileFiltered.join(' ')
+          source: `${profileName} (output template)`,
+          flags: `-o "${profile.output_template}"`
         });
       }
       
-      // 7. Check for filesystem options
-      const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+      if (profile && profile.format_selection && profileToggleFiltered.some(a => a.includes(profile.format_selection))) {
+        breakdown.push({
+          icon: '🎯',
+          source: `${profileName} (format selection)`,
+          flags: `-f "${profile.format_selection}"`
+        });
+      }
+      
+      if (profile && profile.merge_output_format && profileToggleFiltered.some(a => a.includes(profile.merge_output_format))) {
+        breakdown.push({
+          icon: '🎯',
+          source: `${profileName} (merge output format)`,
+          flags: `--merge-output-format ${profile.merge_output_format}`
+        });
+      }
+      
+      if (profile && profile.verbose && profileToggleFiltered.includes('-v')) {
+        breakdown.push({
+          icon: '🎯',
+          source: `${profileName} (verbose)`,
+          flags: '-v'
+        });
+      }
+      
+      if (profile && profile.filename_format && profileToggleFiltered.includes(profile.filename_format)) {
+        breakdown.push({
+          icon: '🎯',
+          source: `${profileName} (filename format)`,
+          flags: profile.filename_format
+        });
+      }
+      
+      if (profileAdditionalFiltered.length > 0) {
+        breakdown.push({
+          icon: '🎯',
+          source: `${profileName} (additional)`,
+          flags: profileAdditionalFiltered.join(' ')
+        });
+      }
+      
+      // 9. Add default format and merge if NO profile or filtered out
+      if (!allArgs.some(arg => arg.startsWith('-f ') || arg === '-f')) {
+        const defaultFormat = '-f "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best"';
+        allArgs.push(defaultFormat);
+        breakdown.push({
+          icon: '⚙️',
+          source: 'Default Format',
+          flags: defaultFormat
+        });
+      }
+      
+      if (!allArgs.some(arg => arg.startsWith('--merge-output-format'))) {
+        const defaultMerge = '--merge-output-format mp4';
+        allArgs.push(defaultMerge);
+        breakdown.push({
+          icon: '⚙️',
+          source: 'Default Merge Format',
+          flags: defaultMerge
+        });
+      }
+      
+      // 10. Check for filesystem options
       const hasFilesystemOption = allArgs.some(arg => filesystemOptions.includes(arg));
       
       // Only add --no-restrict-filenames if no other filesystem options present
@@ -1294,7 +1530,7 @@ function updateComputedOptions(channelId, channel) {
       }
       
       return {
-        combined: allArgs.length > 0 ? allArgs.join(' ') : '(no additional options)',
+        combined: allArgs.length > 0 ? `yt-dlp ${allArgs.join(' ')}` : 'yt-dlp (no additional options)',
         breakdown: breakdown,
         conflicts: conflicts
       };
@@ -1665,6 +1901,22 @@ async function loadConfigPage() {
     document.getElementById('youtube-api-key').placeholder = 'Enter your YouTube Data API v3 key';
   }
   
+  // Load log configuration
+  try {
+    const config = await api.get('/api/config');
+    if (config.log_level) {
+      document.getElementById('log-level').value = config.log_level;
+    }
+    if (config.log_max_size_kb) {
+      document.getElementById('log-max-size').value = config.log_max_size_kb;
+    }
+    if (config.log_max_files) {
+      document.getElementById('log-max-files').value = config.log_max_files;
+    }
+  } catch (err) {
+    console.error('Failed to load log config:', err);
+  }
+  
   // Auto-load cookies if they exist
   try {
     const cookies = await api.get('/api/cookies');
@@ -1678,6 +1930,24 @@ async function loadConfigPage() {
   
   loadCookies();
   loadSchedulerStatus();
+}
+
+async function saveLogConfig() {
+  try {
+    const logLevel = document.getElementById('log-level').value;
+    const logMaxSize = document.getElementById('log-max-size').value;
+    const logMaxFiles = document.getElementById('log-max-files').value;
+    
+    await api.put('/api/config', {
+      log_level: logLevel,
+      log_max_size_kb: logMaxSize,
+      log_max_files: logMaxFiles
+    });
+    
+    showNotification('Log configuration saved successfully. Rotation settings will apply after restart.', 'success');
+  } catch (err) {
+    showNotification('Failed to save log configuration: ' + err.message, 'error');
+  }
 }
 
 function showAddChannelModal() {
@@ -1807,6 +2077,8 @@ async function handleAddProfile(e) {
     output_template: document.getElementById('profile-output-template').value.trim(),
     format_selection: document.getElementById('profile-format').value.trim() || null,
     merge_output_format: document.getElementById('profile-merge-format').value.trim() || null,
+    verbose: document.getElementById('profile-verbose').checked,
+    filename_format: document.getElementById('profile-filename-format').value,
     additional_args: document.getElementById('profile-additional-args').value.trim() || null
   };
   
@@ -1842,6 +2114,8 @@ async function editProfile(profileId) {
     document.getElementById('edit-profile-output-template').value = profile.output_template;
     document.getElementById('edit-profile-format').value = profile.format_selection || '';
     document.getElementById('edit-profile-merge-format').value = profile.merge_output_format || '';
+    document.getElementById('edit-profile-verbose').checked = profile.verbose === 1;
+    document.getElementById('edit-profile-filename-format').value = profile.filename_format || '--no-restrict-filenames';
     document.getElementById('edit-profile-additional-args').value = profile.additional_args || '';
     
     // Show the modal
@@ -1877,6 +2151,8 @@ async function handleEditProfile(e) {
     output_template: document.getElementById('edit-profile-output-template').value.trim(),
     format_selection: document.getElementById('edit-profile-format').value.trim() || null,
     merge_output_format: document.getElementById('edit-profile-merge-format').value.trim() || null,
+    verbose: document.getElementById('edit-profile-verbose').checked,
+    filename_format: document.getElementById('edit-profile-filename-format').value,
     additional_args: document.getElementById('edit-profile-additional-args').value.trim() || null
   };
   
@@ -1905,9 +2181,12 @@ async function loadProfilesIntoDropdowns() {
     }
     
     // Update all edit channel profile dropdowns (select elements in channel modals only)
+    // Match only IDs like edit-profile-123 (numeric channel IDs), not edit-profile-name, edit-profile-filename-format, etc.
     document.querySelectorAll('select[id^="edit-profile-"]').forEach(select => {
-      // Skip the edit profile modal selects
-      if (select.id === 'edit-preset-select') return;
+      // Skip if not a numeric channel ID (e.g., edit-profile-name, edit-profile-filename-format)
+      const idParts = select.id.split('-');
+      const lastPart = idParts[idParts.length - 1];
+      if (!/^\d+$/.test(lastPart)) return; // Skip if last part is not a number
       
       const currentValue = select.value;
       select.innerHTML = '<option value="">None (use custom options below)</option>' +

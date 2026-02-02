@@ -115,6 +115,41 @@ class DB {
       );
     `);
     
+    // Create config table for app settings
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS config (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at INTEGER DEFAULT (strftime('%s', 'now'))
+      );
+    `);
+    
+    // Initialize default config values if not exists
+    this.db.run(`
+      INSERT OR IGNORE INTO config (key, value) VALUES 
+        ('log_level', 'error'),
+        ('log_max_size_kb', '10240'),
+        ('log_max_files', '5');
+    `);
+    
+    // Migration: Add verbose and filename_format columns to profiles if they don't exist
+    try {
+      const result = this.db.exec("PRAGMA table_info(profiles)");
+      const columns = result[0]?.values.map(row => row[1]) || [];
+      if (!columns.includes('verbose')) {
+        this.db.run("ALTER TABLE profiles ADD COLUMN verbose INTEGER DEFAULT 0");
+        this.save();
+        console.log('Migration: Added verbose column to profiles table');
+      }
+      if (!columns.includes('filename_format')) {
+        this.db.run("ALTER TABLE profiles ADD COLUMN filename_format TEXT DEFAULT '--no-restrict-filenames'");
+        this.save();
+        console.log('Migration: Added filename_format column to profiles table');
+      }
+    } catch (err) {
+      console.log('Migration check for profiles columns skipped or already applied');
+    }
+    
     // Migration: Add video_count column if it doesn't exist
     try {
       const result = this.db.exec("PRAGMA table_info(playlists)");
@@ -253,14 +288,16 @@ class DB {
   // Profiles
   addProfile(profileData) {
     this.db.run(`
-      INSERT INTO profiles (name, output_template, format_selection, merge_output_format, additional_args)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO profiles (name, output_template, format_selection, merge_output_format, additional_args, verbose, filename_format)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [
       profileData.name,
       profileData.output_template,
       profileData.format_selection || null,
       profileData.merge_output_format || null,
-      profileData.additional_args || null
+      profileData.additional_args || null,
+      profileData.verbose ? 1 : 0,
+      profileData.filename_format || '--no-restrict-filenames'
     ]);
     const result = this.db.exec('SELECT last_insert_rowid() as id');
     this.save();
@@ -289,6 +326,16 @@ class DB {
         values.push(profileData[field]);
       }
     });
+    
+    if (profileData.verbose !== undefined) {
+      fields.push('verbose = ?');
+      values.push(profileData.verbose ? 1 : 0);
+    }
+    
+    if (profileData.filename_format !== undefined) {
+      fields.push('filename_format = ?');
+      values.push(profileData.filename_format);
+    }
     
     if (fields.length === 0) return;
     
@@ -647,6 +694,32 @@ class DB {
       obj[col] = values[i];
     });
     return obj;
+  }
+
+  // Config methods
+  getConfig(key) {
+    const result = this.db.exec('SELECT value FROM config WHERE key = ?', [key]);
+    if (result.length === 0 || result[0].values.length === 0) return null;
+    return result[0].values[0][0];
+  }
+
+  getAllConfig() {
+    const result = this.db.exec('SELECT key, value FROM config');
+    if (result.length === 0) return {};
+    const config = {};
+    result[0].values.forEach(row => {
+      config[row[0]] = row[1];
+    });
+    return config;
+  }
+
+  setConfig(key, value) {
+    this.db.run(`
+      INSERT INTO config (key, value, updated_at) 
+      VALUES (?, ?, strftime('%s', 'now'))
+      ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = strftime('%s', 'now')
+    `, [key, value, value]);
+    this.save();
   }
 
   close() {

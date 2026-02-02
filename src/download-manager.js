@@ -308,49 +308,76 @@ class DownloadManager {
         : `--sponsorblock-remove ${categories}`;
     }
 
-    // Step 5: Filter profile args (remove toggle AND custom conflicts)
-    let filteredProfileArgs = '';
+    // Step 5: Filter and add profile toggles (verbose, filename_format)
+    // These are filtered by channel toggles + channel custom
+    const profileToggleFlags = [];
+    let filteredProfileToggles = [];
+    
     if (profile) {
       const filterList = [...toggleFlags, ...customFlags];
+      const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+      const customHasFilesystemFlag = customFlags.some(flag => filesystemOptions.includes(flag));
       
-      // Don't add format/merge to profile args if they're base properties
-      if (profile.additional_args) {
-        const profileArgsParsed = profile.additional_args.split(/\s+/);
-        const filtered = [];
+      // Add profile verbose if enabled
+      if (profile.verbose && !filterList.includes('-v')) {
+        filteredProfileToggles.push('-v');
+        profileToggleFlags.push('-v');
+      }
+      
+      // Add profile filename format if set (and not overridden by custom filesystem flag)
+      if (profile.filename_format && !customHasFilesystemFlag && !filesystemOptions.some(opt => filterList.includes(opt))) {
+        filteredProfileToggles.push(profile.filename_format);
+        profileToggleFlags.push(profile.filename_format);
+      }
+    }
+    
+    // Step 6: Filter profile additional_args (filtered by channel toggles + channel custom + profile toggles)
+    let filteredProfileArgs = '';
+    if (profile && profile.additional_args) {
+      const filterList = [...toggleFlags, ...customFlags, ...profileToggleFlags];
+      const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
+      const higherHasFilesystemFlag = customFlags.some(flag => filesystemOptions.includes(flag)) || 
+                                       profileToggleFlags.some(flag => filesystemOptions.includes(flag));
+      
+      const profileArgsParsed = profile.additional_args.split(/\s+/);
+      const filtered = [];
+      
+      for (let i = 0; i < profileArgsParsed.length; i++) {
+        const arg = profileArgsParsed[i];
+        const argWithoutValue = arg.split('=')[0];
         
-        for (let i = 0; i < profileArgsParsed.length; i++) {
-          const arg = profileArgsParsed[i];
-          const argWithoutValue = arg.split('=')[0];
-          
-          if (filterList.includes(argWithoutValue)) {
-            // Skip this flag and its value
-            if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
-              const nextToken = profileArgsParsed[i + 1];
-              if (!nextToken.startsWith('-')) {
-                i++;
-                if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
-                  while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
-                    i++;
-                  }
+        // Check if this should be filtered
+        const shouldFilter = filterList.includes(argWithoutValue) || 
+                             (higherHasFilesystemFlag && filesystemOptions.includes(argWithoutValue));
+        
+        if (shouldFilter) {
+          // Skip this flag and its value
+          if (!arg.includes('=') && argWithoutValue.startsWith('-') && i + 1 < profileArgsParsed.length) {
+            const nextToken = profileArgsParsed[i + 1];
+            if (!nextToken.startsWith('-')) {
+              i++;
+              if (nextToken.startsWith('"') && !nextToken.endsWith('"')) {
+                while (i + 1 < profileArgsParsed.length && !profileArgsParsed[i].endsWith('"')) {
+                  i++;
                 }
               }
             }
-          } else {
-            filtered.push(arg);
           }
+        } else {
+          filtered.push(arg);
         }
-        
-        filteredProfileArgs = filtered.join(' ');
       }
+      
+      filteredProfileArgs = filtered.join(' ');
     }
 
-    // Step 6: Combine all args in priority order: Toggles > SponsorBlock > Custom > Profile
-    const allArgs = [enhancedArgs.join(' '), sponsorblockArgs, filteredCustomArgs, filteredProfileArgs]
+    // Step 7: Combine all args in priority order: Toggles > SponsorBlock > Custom > Profile Toggles > Profile Additional
+    const allArgs = [enhancedArgs.join(' '), sponsorblockArgs, filteredCustomArgs, filteredProfileToggles.join(' '), filteredProfileArgs]
       .filter(Boolean)
       .join(' ')
       .trim();
 
-    // Step 7: Handle filesystem options
+    // Step 8: Handle filesystem options
     const filesystemOptions = ['--restrict-filenames', '--no-restrict-filenames', '--windows-filenames', '--no-windows-filenames'];
     const hasFilesystemOption = filesystemOptions.some(opt => allArgs.includes(opt));
     const customArgs = hasFilesystemOption ? allArgs : (allArgs ? `${allArgs} --no-restrict-filenames` : '--no-restrict-filenames');
@@ -424,23 +451,11 @@ class DownloadManager {
 
       // Queue videos for download with playlist metadata
       for (const video of pendingVideos) {
-        const downloadOptions = {
-          outputPath: this.downloadsPath,
-          outputTemplate,
-          format: 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080] / best',
-          mergeOutputFormat: 'mp4',
-          writeInfoJson: true,
-          noRestrictFilenames: true,
-          writeThumbnail: true,
-          downloadArchive: path.join(this.downloadsPath, '.downloaded'),
-          customArgs: channel.yt_dlp_options,
-          // Pass playlist metadata to yt-dlp
-          playlistMetadata: {
-            playlist_title: playlist.playlist_title,
-            playlist_id: playlist.playlist_id,
-            playlist_index: video.playlist_index
-          }
-        };
+        // Build proper download options using the hierarchy system
+        const downloadOptions = await this.buildDownloadOptions(playlistId);
+        
+        // Update playlist_index for each video (buildDownloadOptions doesn't have this)
+        downloadOptions.playlistMetadata.playlist_index = video.playlist_index;
         
         this.queue.push({
           videoId: video.video_id,

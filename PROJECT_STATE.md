@@ -1,8 +1,8 @@
 # yt-dlp-ui Project State & History
 
-**Last Updated:** 2026-01-31  
-**Version:** 1.3.0  
-**Status:** Production-Ready with Comprehensive Test Coverage
+**Last Updated:** 2026-02-01  
+**Version:** 1.4.0  
+**Status:** Production-Ready with Advanced Options System
 
 > **⚠️ IMPORTANT FOR AI ASSISTANTS:**  
 > 
@@ -59,12 +59,20 @@
 - **Download Archive**: Tracks downloaded videos to avoid duplicates, syncs with deletions
 - **Graceful Shutdown**: Waits up to 3 minutes for downloads to complete, cleans up partial files
 
-#### yt-dlp Profiles System (NEW)
+#### yt-dlp Profiles System
 - **Profile Management**: Create reusable download profiles with custom settings
 - **Presets**: "Plex - YouTube-Agent" preset for quick setup
 - **Profile Assignment**: Assign profiles to channels (add/edit)
-- **Profile Components**: Output template, format selection, merge format, additional args
-- **Flexible Override**: Use profiles OR custom options per channel
+- **Profile Toggles**: 
+  - Output template with `-o` flag
+  - Format selection (video+audio format specification)
+  - Merge output format (container: mp4, mkv, etc.)
+  - Verbose flag (shows detailed download progress)
+  - Filename format (4 options: normal, restricted, windows, no-restrict)
+- **Profile Additional Args**: Custom yt-dlp arguments for advanced use cases
+- **4-Level Option Hierarchy**: Channel Toggles > Channel Custom > Profile Toggles > Profile Additional
+- **Smart Conflict Detection**: Shows when higher-priority options override lower ones
+- **Complete Preview**: Frontend shows exact command that will execute
 
 #### URL Types Supported
 1. **Channel URLs**: `@channelname`, `/channel/ID`, `/c/name`, `/user/name`
@@ -143,9 +151,13 @@
 
 #### Security & Configuration
 - **HTTP Basic Authentication**: Optional username/password protection
-- **Logging System**: Winston logger with file rotation (error.log, combined.log)
-- **Log Levels**: error, warn, info, debug (default: debug)
+- **Logging System**: Winston logger with file rotation and configurable levels
+- **Log Levels**: error, warn, info, http, verbose, debug, silly (default: error, configurable via UI)
+- **Log Configuration**: UI controls for log level, max size (KB), and rotation count
+- **Dynamic Log Level**: Changes apply immediately without restart
 - **Cookie Management**: Upload/edit YouTube cookies through UI
+- **YouTube Data API v3**: Optional API key for faster enumeration
+- **Handle Resolution Caching**: One-time yt-dlp extraction, then API speed forever
 - **Environment Variables**: Fully configurable via Docker env vars
 
 #### Database
@@ -244,7 +256,13 @@ resolution, fps, vcodec, acodec, created_at, updated_at
 **Profiles Table (NEW):**
 ```sql
 id, name, output_template, format_selection, merge_output_format,
-additional_args, created_at, updated_at
+verbose, filename_format, additional_args, created_at, updated_at
+```
+
+**Config Table (NEW):**
+```sql
+key, value
+-- Stores: log_level, log_max_size_kb, log_max_files
 ```
 
 ### 🐛 Known Issues & Limitations
@@ -723,6 +741,79 @@ open http://localhost:8189
 ### Recent Changes (Last 5 Commits)
 
 > **Note**: Run `git log --oneline -10` to see latest commits
+
+**Latest Session Changes (2026-02-01):**
+- **IMPLEMENTED: Complete Option Hierarchy System** (MAJOR FEATURE)
+  - 4-level hierarchy: Channel Toggles > Channel Custom > Profile Toggles > Profile Additional
+  - Channel toggles (metadata, thumbnails, subtitles, SponsorBlock) override everything
+  - Channel custom options override profile settings
+  - Profile toggles (format, merge, output, verbose, filename format) override profile additional args
+  - Profile additional args lowest priority
+  - Smart conflict detection shows when higher-priority options override lower ones
+  - Frontend preview now matches backend download logic exactly
+- **IMPLEMENTED: Profile Toggles** (NEW FEATURE)
+  - Added verbose toggle to profiles (boolean field)
+  - Added filename format dropdown to profiles (4 options: normal, restricted, windows, no-restrict)
+  - Added output template to profiles (-o flag)
+  - Profile toggles integrated into hierarchy and conflict detection
+  - Database migration adds verbose and filename_format columns
+- **IMPLEMENTED: Filesystem Flag Exclusivity** (CRITICAL FIX)
+  - 4 mutually exclusive flags: --restrict-filenames, --no-restrict-filenames, --windows-filenames, --no-windows-filenames
+  - If channel custom has ANY filesystem flag, ALL profile filesystem flags filtered out
+  - Prevents conflicts between incompatible filename sanitization options
+  - Works across both profile toggles and profile additional args
+- **IMPLEMENTED: Complete Argument Display** (CRITICAL FIX)
+  - Fixed custom args showing flag without value (e.g., --dateafter with no date)
+  - Implemented argument Maps (customArgsMap, profileToggleArgsMap) to store complete arguments
+  - Fixed quoted value tokenization (e.g., -o "template with spaces")
+  - Advance loop index past ALL consumed tokens when building arguments
+  - Conflict detection now shows complete arguments like "--dateafter 20081004"
+- **IMPLEMENTED: Logging Configuration System** (NEW FEATURE)
+  - Created config table in database with log_level, log_max_size_kb, log_max_files
+  - Added UI on Config page: log level dropdown with verbosity descriptions
+  - Log level changes apply immediately (no restart needed)
+  - Rotation settings apply on restart
+  - Default log level changed from 'debug' to 'error' for production
+  - At debug/silly level, logs complete yt-dlp command for troubleshooting
+  - Supports 6 levels: error, warn, info, http, verbose, debug, silly
+- **FIXED: Critical Playlist Download Bug** (CRITICAL FIX)
+  - downloadPlaylist() was completely bypassing buildDownloadOptions()
+  - Was hardcoding defaults: default format, no toggles, no SponsorBlock, no profiles
+  - Only passed raw channel.yt_dlp_options without any hierarchy logic
+  - This meant ALL playlist downloads were broken and ignoring user settings
+  - Fixed to call buildDownloadOptions() properly and update playlist_index per video
+  - Now uses full 4-level hierarchy for every playlist video download
+- **IMPLEMENTED: YouTube Handle Resolution Caching** (OPTIMIZATION)
+  - @handle URLs now resolved via one-time yt-dlp extraction
+  - extractChannelId() method uses yt-dlp --dump-json --playlist-items 0 (fast, no downloads)
+  - Channel ID cached in database on first enumeration
+  - Subsequent enumerations use fast YouTube API with cached channel_id
+  - One-time yt-dlp cost, then API speed forever
+  - Graceful fallback if API fails or no key
+- **FIXED: Multiple Minor UI/Logic Bugs**
+  - Fixed orphaned quoted strings in command preview
+  - Fixed duplicate format/merge flags in preview
+  - Fixed profile filename dropdown being populated with profile names
+  - Fixed playlist_title undefined error in downloadPlaylist()
+  - Added smart conflict detection for all profile toggle types
+  - Changed final command preview heading to "yt-dlp Command Used for This Channel"
+
+**Files Modified:**
+- `src/database.js` - Added profiles verbose/filename_format columns, created config table
+- `src/server.js` - Updated profile endpoints, added config API, added ytdlp injection for handle resolution
+- `src/download-manager.js` - Implemented 4-level hierarchy, fixed downloadPlaylist(), filesystem exclusivity
+- `src/logger.js` - Configurable log level/rotation, default changed to 'error'
+- `src/ytdlp-service.js` - Added extractChannelId(), command logging at debug level, accepts cachedChannelId
+- `src/youtube-api-service.js` - Added ytdlp injection, resolveHandleToChannelId() uses extraction, enumeratePlaylistsByChannelId()
+- `public/index.html` - Added profile toggles UI, added logging config section
+- `public/js/app.js` - Complete refactor of updateComputedOptions() for hierarchy, conflict detection, argument maps
+
+**Technical Achievements:**
+- Frontend preview logic now 100% matches backend download logic
+- Complete visibility into option conflicts and overrides
+- Smart filesystem flag handling prevents incompatible combinations
+- Logging system provides production defaults with debug capabilities
+- Handle resolution provides one-time cost for permanent API speed gain
 
 **Latest Session Changes (2026-01-31):**
 - **IMPLEMENTED: Wiki Link Cleanup** (MAINTENANCE)

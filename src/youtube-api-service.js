@@ -10,6 +10,11 @@ class YouTubeApiService {
     this.apiKey = this.loadApiKey();
     this.quotaData = this.loadQuotaData();
     this.baseUrl = 'https://www.googleapis.com/youtube/v3';
+    this.ytdlpService = null; // Will be set after YtDlpService is created
+  }
+  
+  setYtDlpService(ytdlpService) {
+    this.ytdlpService = ytdlpService;
   }
 
   loadApiKey() {
@@ -176,9 +181,22 @@ class YouTubeApiService {
   }
 
   async resolveHandleToChannelId(handle) {
-    // YouTube API doesn't have a direct handle->channel endpoint
-    // We need to use search or fall back to yt-dlp
-    throw new Error('Handle resolution not yet implemented, will use yt-dlp fallback');
+    // Use yt-dlp to extract channel ID from handle
+    if (!this.ytdlpService) {
+      throw new Error('YtDlpService not initialized');
+    }
+    
+    logger.info(`Resolving handle ${handle} to channel ID using yt-dlp`);
+    const handleUrl = `https://www.youtube.com/@${handle}`;
+    
+    try {
+      const result = await this.ytdlpService.extractChannelId(handleUrl);
+      logger.info(`Resolved @${handle} -> ${result.channel_id}`);
+      return result.channel_id;
+    } catch (err) {
+      logger.error(`Failed to resolve handle @${handle}:`, err);
+      throw new Error('Handle resolution failed, will use yt-dlp fallback');
+    }
   }
 
   async resolveUsernameToChannelId(username) {
@@ -204,9 +222,8 @@ class YouTubeApiService {
     }
   }
 
-  async enumeratePlaylists(channelUrl) {
+  async enumeratePlaylistsByChannelId(channelId) {
     try {
-      const channelId = await this.getChannelIdFromUrl(channelUrl);
       const playlists = [];
       let pageToken = null;
       let pageCount = 0;
@@ -227,16 +244,31 @@ class YouTubeApiService {
         playlists.push(...data.items.map(item => ({
           playlist_id: item.id,
           playlist_title: item.snippet.title,
-          video_count: item.contentDetails.itemCount,
-          playlist_url: `https://www.youtube.com/playlist?list=${item.id}`
+          playlist_url: `https://www.youtube.com/playlist?list=${item.id}`,
+          video_count: item.contentDetails.itemCount || 0
         })));
 
         pageToken = data.nextPageToken;
         pageCount++;
+        
+        if (pageCount >= 10) {
+          logger.warn('Stopped at 10 pages to prevent infinite loop');
+          break;
+        }
       } while (pageToken);
 
-      logger.info(`YouTube API: Enumerated ${playlists.length} playlists from ${channelId}`);
+      logger.info(`YouTube API: Found ${playlists.length} playlists`);
       return playlists;
+    } catch (err) {
+      logger.error('YouTube API enumeratePlaylists error:', err);
+      throw err;
+    }
+  }
+
+  async enumeratePlaylists(channelUrl) {
+    try {
+      const channelId = await this.getChannelIdFromUrl(channelUrl);
+      return await this.enumeratePlaylistsByChannelId(channelId);
     } catch (err) {
       logger.error('YouTube API enumeration failed:', err);
       throw err;

@@ -68,20 +68,35 @@ class YtDlpService {
     return 'unknown';
   }
 
-  async enumeratePlaylists(channelUrl) {
+  async enumeratePlaylists(channelUrl, cachedChannelId = null) {
     // Try YouTube API first if available
     if (this.youtubeApi && this.youtubeApi.hasValidApiKey()) {
       try {
         logger.info('Attempting enumeration with YouTube Data API');
-        const playlists = await this.youtubeApi.enumeratePlaylists(channelUrl);
         
-        // Extract channel info from URL as best we can
-        const channelIdMatch = channelUrl.match(/\/channel\/(UC[\w-]+)/);
+        // If we have a cached channel ID, use it directly
+        let channelId = cachedChannelId;
+        
+        // Otherwise, try to get/resolve it from the URL
+        if (!channelId) {
+          channelId = await this.youtubeApi.getChannelIdFromUrl(channelUrl);
+        } else {
+          logger.debug(`Using cached channel ID: ${channelId}`);
+        }
+        
+        // Use the channel ID to enumerate playlists via API
+        const playlists = await this.youtubeApi.enumeratePlaylistsByChannelId(channelId);
+        
+        // Try to get channel name
+        let channelName = null;
         const handleMatch = channelUrl.match(/@([\w-]+)/);
+        if (handleMatch) {
+          channelName = handleMatch[1];
+        }
         
         return {
-          channel_id: channelIdMatch ? channelIdMatch[1] : null,
-          channel_name: handleMatch ? handleMatch[1] : null,
+          channel_id: channelId,
+          channel_name: channelName,
           playlists,
           method: 'youtube-api'
         };
@@ -237,6 +252,61 @@ class YtDlpService {
           resolve(count);
         } catch (err) {
           reject(new Error(`Failed to parse playlist info: ${err.message}`));
+        }
+      });
+    });
+  }
+
+  async extractChannelId(channelUrl) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--dump-json',
+        '--playlist-items', '0',  // Don't download any videos, just get channel metadata
+        '--flat-playlist',
+        '--skip-download'
+      ];
+
+      if (fs.existsSync(this.cookiesPath)) {
+        args.push('--cookies', this.cookiesPath);
+      }
+
+      args.push(channelUrl);
+
+      const ytdlp = spawn('yt-dlp', args);
+      let stdout = '';
+      let stderr = '';
+
+      ytdlp.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      ytdlp.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      ytdlp.on('close', (code) => {
+        if (code !== 0) {
+          return reject(new Error(`yt-dlp failed to extract channel ID: ${stderr}`));
+        }
+
+        try {
+          const lines = stdout.trim().split('\n').filter(line => line);
+          if (lines.length === 0) {
+            return reject(new Error('No output from yt-dlp'));
+          }
+
+          const metadata = JSON.parse(lines[0]);
+          const channelId = metadata.channel_id || metadata.uploader_id;
+          const channelName = metadata.channel || metadata.uploader;
+          
+          if (!channelId) {
+            return reject(new Error('Could not extract channel ID from metadata'));
+          }
+          
+          logger.debug(`Extracted channel ID: ${channelId} (${channelName})`);
+          resolve({ channel_id: channelId, channel_name: channelName });
+        } catch (err) {
+          reject(new Error(`Failed to parse channel metadata: ${err.message}`));
         }
       });
     });
@@ -435,6 +505,9 @@ class YtDlpService {
       }
 
       args.push(url);
+
+      logger.debug(`Executing yt-dlp command: yt-dlp ${args.join(' ')}`);
+      logger.info(`Starting download: ${url}`);
 
       const ytdlp = spawn('yt-dlp', args);
       let lastProgress = {};

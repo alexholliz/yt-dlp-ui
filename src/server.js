@@ -31,12 +31,20 @@ const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD;
 const db = new DB(DB_PATH);
 const youtubeApi = new YouTubeApiService(CONFIG_PATH);
 const ytdlp = new YtDlpService(COOKIES_PATH, youtubeApi);
+youtubeApi.setYtDlpService(ytdlp); // Enable handle resolution via yt-dlp
 const downloadManager = new DownloadManager(db, ytdlp, DOWNLOADS_PATH);
 const scheduler = new Scheduler(db, downloadManager);
 
 // Wait for DB to initialize
 db.ready.then(() => {
   logger.info('Database ready');
+  
+  // Load log level from database
+  const configLogLevel = db.getConfig('log_level');
+  if (configLogLevel) {
+    logger.level = configLogLevel;
+    logger.info(`Log level set from database: ${configLogLevel}`);
+  }
   
   // Middleware
   app.use(bodyParser.json({ limit: '10mb' })); // Increase limit for large cookie files
@@ -88,8 +96,8 @@ db.ready.then(() => {
 
   app.post('/api/profiles', (req, res) => {
     try {
-      const { name, output_template, format_selection, merge_output_format, additional_args } = req.body;
-      const id = db.addProfile({ name, output_template, format_selection, merge_output_format, additional_args });
+      const { name, output_template, format_selection, merge_output_format, additional_args, verbose, filename_format } = req.body;
+      const id = db.addProfile({ name, output_template, format_selection, merge_output_format, additional_args, verbose, filename_format });
       res.json({ id, success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -98,8 +106,8 @@ db.ready.then(() => {
 
   app.put('/api/profiles/:id', (req, res) => {
     try {
-      const { name, output_template, format_selection, merge_output_format, additional_args } = req.body;
-      db.updateProfile(req.params.id, { name, output_template, format_selection, merge_output_format, additional_args });
+      const { name, output_template, format_selection, merge_output_format, additional_args, verbose, filename_format } = req.body;
+      db.updateProfile(req.params.id, { name, output_template, format_selection, merge_output_format, additional_args, verbose, filename_format });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -324,7 +332,8 @@ db.ready.then(() => {
         return res.status(404).json({ error: 'Channel not found' });
       }
 
-      const result = await ytdlp.enumeratePlaylists(channel.url);
+      // Pass cached channel_id if available to optimize API calls
+      const result = await ytdlp.enumeratePlaylists(channel.url, channel.channel_id);
 
       db.updateChannel(req.params.id, {
         channel_id: result.channel_id,
@@ -1076,6 +1085,44 @@ db.ready.then(() => {
   });
 
   // Start server
+  
+  // Config API endpoints
+  app.get('/api/config', (req, res) => {
+    try {
+      const config = db.getAllConfig();
+      res.json(config);
+    } catch (err) {
+      logger.error('Error getting config:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put('/api/config', (req, res) => {
+    try {
+      const { log_level, log_max_size_kb, log_max_files } = req.body;
+      
+      if (log_level) {
+        db.setConfig('log_level', log_level);
+        // Update logger level dynamically
+        logger.level = log_level;
+        logger.info(`Log level changed to: ${log_level}`);
+      }
+      
+      if (log_max_size_kb) {
+        db.setConfig('log_max_size_kb', log_max_size_kb);
+      }
+      
+      if (log_max_files) {
+        db.setConfig('log_max_files', log_max_files);
+      }
+      
+      res.json({ success: true, message: 'Config updated. Log rotation settings will apply on next restart.' });
+    } catch (err) {
+      logger.error('Error updating config:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.listen(PORT, '0.0.0.0', () => {
     logger.info(`yt-dlp-ui server running on port ${PORT}`);
     logger.info(`Database: ${DB_PATH}`);
