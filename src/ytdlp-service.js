@@ -512,6 +512,7 @@ class YtDlpService {
       const ytdlp = spawn('yt-dlp', args);
       let lastProgress = {};
       let capturedFilePath = null;
+      let stderrOutput = ''; // Collect stderr for error messages
       
       ytdlp.stdout.on('data', (data) => {
         const output = data.toString();
@@ -541,14 +542,20 @@ class YtDlpService {
       });
 
       ytdlp.stderr.on('data', (data) => {
-        console.error(data.toString());
+        const errorText = data.toString();
+        stderrOutput += errorText; // Accumulate stderr
+        console.error(errorText);
       });
 
       ytdlp.on('close', (code) => {
         if (code === 0) {
           resolve(capturedFilePath);
         } else {
-          reject(new Error(`yt-dlp exited with code ${code}`));
+          // Include stderr output in error message for better troubleshooting
+          const errorMessage = stderrOutput.trim() 
+            ? `yt-dlp failed: ${stderrOutput.trim()}`
+            : `yt-dlp exited with code ${code}`;
+          reject(new Error(errorMessage));
         }
       });
     });

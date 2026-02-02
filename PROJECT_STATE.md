@@ -281,17 +281,20 @@ key, value
 4. **Playlist Preview Counts**: YouTube /playlists tab only shows preview (2-3 videos)
    - **Solution**: Individual refresh or download gets real count
 
-5. **Media History View**: Deleted videos remain in history view
-   - **TODO**: Update DELETE /api/videos/:id endpoint to also remove from history
-   - **Impact**: Low priority - doesn't affect functionality, just UI clarity
+5. ~~**Media History View**: Deleted videos remain in history view~~ ✅ **Already Fixed**
+   - Videos are properly deleted from database when using DELETE endpoint
+   - Media history query only shows videos with status ('completed', 'failed')
+   - Deleted videos do not appear in history
+   - **Status**: No action needed - working as intended
 
-6. **Failed Download Error Messages**: Shows generic "yt-dlp exited with code 1" instead of actual error
-   - **Current**: Database stores error_message but UI shows exit code
-   - **TODO**: Display actual error message in media history and video modal
-   - **Example**: Cookie-related errors should show "Sign in to confirm you're not a bot" not just "code 1"
-   - **Impact**: Medium priority - makes troubleshooting difficult
+6. ~~**Failed Download Error Messages**: Shows generic "yt-dlp exited with code 1" instead of actual error~~ ✅ **FIXED v1.4.0**
+   - Now captures stderr output from yt-dlp during downloads
+   - Error message includes actual yt-dlp error text
+   - Examples: "Sign in to confirm you're not a bot", "Video unavailable", "Private video"
+   - Stored in database error_message field and displayed in UI
+   - Much better for troubleshooting download failures
 
-**All critical bugs fixed as of 2026-01-31!**
+**All known bugs fixed as of 2026-02-01!**
 
 ### 📈 Performance Characteristics
 
