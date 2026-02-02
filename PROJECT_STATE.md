@@ -1076,26 +1076,6 @@ open http://localhost:8189
    - Display message: "SponsorBlock only supported for YouTube content"
    - Detect YouTube URLs vs other sites
 
-#### 🎨 UI/UX Improvements
-
-8. **Browser Refresh State Preservation**
-   - Save current page/view in localStorage or URL
-   - Restore user to same page after browser refresh
-   - Currently always returns to home page
-   - Improves user experience during active session
-
-9. **YouTube API Quota Tracker Improvements**
-   - Only display quota tracker when API key is configured
-   - Check for API key in config OR local file
-   - Hide quota UI when no API key present
-   - **Test**: Verify API query tracking actually works
-
-10. **Pipeline Readability in GitHub Actions**
-    - Break out test steps into individual named steps
-    - Show clear step names in Actions UI instead of blob
-    - Easier to identify which specific test failed
-    - Better progress visibility
-
 #### 🏗️ DevOps & Infrastructure
 
 6. **Stable & Dev Branch Strategy**
@@ -1122,7 +1102,7 @@ open http://localhost:8189
 
 #### 🔒 Security & Infrastructure
 
-15. **Reverse Proxy HTTPS Support**
+9. **Reverse Proxy HTTPS Support**
     - Verify basic auth works behind reverse proxy
     - Ensure auth headers preserved through proxy
     - Document nginx/Traefik/Caddy configuration
@@ -1131,13 +1111,13 @@ open http://localhost:8189
 
 #### 📦 Content Management
 
-16. **Channel Non-Playlist Video Downloads**
+10. **Channel Non-Playlist Video Downloads**
     - New mode for channels to download videos not in any playlist
     - "All Videos" tab/mode alongside playlists
     - Handles shorts, community posts, live streams
     - Optional: separate enable/disable toggle from playlists
 
-17. **Multi-Site Support (Beyond YouTube)**
+11. **Multi-Site Support (Beyond YouTube)**
     - Support for non-YouTube sites (leveraging yt-dlp's 1000+ extractors)
     - Site-specific configuration profiles
     - URL validation for supported sites
@@ -1147,54 +1127,54 @@ open http://localhost:8189
 
 #### 🎯 Nice-to-Have Features
 
-18. **Additional Profile Presets**
+12. **Additional Profile Presets**
     - "720p Space Saver" preset
     - "Max Quality" preset
     - "Audio Only" preset
 
-19. **Video Thumbnails**
+13. **Video Thumbnails**
     - Display in history table
     - Show in video metadata modal  
     - Lazy load for performance
 
-20. **Advanced Filtering**
+14. **Advanced Filtering**
     - Filter videos by channel, playlist, or status
     - Search videos by title
     - Date range filtering
 
-21. **Batch Channel Management**
+15. **Batch Channel Management**
     - Import channels from text file
     - Export channel list
     - Bulk enable/disable channels
 
-22. **Download Statistics**
+16. **Download Statistics**
     - Charts for download history
     - Bandwidth usage tracking
     - Success/failure rates
 
-23. **Mobile Responsive UI**
+17. **Mobile Responsive UI**
     - Optimize sidebar for mobile
     - Touch-friendly controls
     - Responsive tables
 
-24. **Notifications**
+18. **Notifications**
     - Discord webhook
     - Telegram bot
     - Email alerts
     - Download completion notifications
 
-25. **Advanced Scheduling**
+19. **Advanced Scheduling**
     - Per-channel schedules
     - Time-of-day preferences
     - Bandwidth limiting
 
-26. **Statistics Dashboard**
+20. **Statistics Dashboard**
     - Charts and graphs
     - Download trends
     - Popular playlists
     - Storage usage over time
 
-27. **Export/Import**
+21. **Export/Import**
     - Backup configuration
     - Import from Pinchflat
     - Export channel list
