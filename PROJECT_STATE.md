@@ -821,7 +821,15 @@ open http://localhost:8189
 
 > **Note**: Run `git log --oneline -10` to see latest commits
 
-**Latest Session Changes (2026-02-01):**
+**Latest Session Changes (2026-02-02):**
+- **COMPLETED: Second Round Refactoring Analysis** (PLANNING)
+  - Analyzed entire codebase for additional duplication patterns after Phase 1 refactoring
+  - Identified 8 new patterns with 200-225 lines of savings potential
+  - Priority targets: Table rendering (40 lines), API route errors (35 lines), modal backgrounds (30 lines), form handling (55 lines)
+  - Created REFACTORING_TARGETS_V2.md with detailed analysis and implementation recommendations
+  - Organized into phases: Quick Wins (2-3 hrs), Backend Improvements (1-2 hrs), Form Handling (1 hr)
+  - Grand total potential across both phases: 446-471 lines (15-16% of codebase)
+  - Focus on high-impact, low-complexity improvements first
 - **IMPLEMENTED: Modal Control Utilities** (CODE QUALITY)
   - Created generic `openModal(modalId, onOpen)` and `closeModal(modalId, onClose)` utilities
   - Refactored 8 modal control functions to use generic utilities
@@ -829,7 +837,8 @@ open http://localhost:8189
   - Utilities support optional callbacks for custom behavior (focus input, reset form)
   - Infrastructure in place for future modals - no need to write custom open/close functions
   - Improves consistency and reduces boilerplate for modal management
-- **IMPLEMENTED: API Error Handler Wrapper** (CODE QUALITY)
+
+**Latest Session Changes (2026-02-01):**
   - Created `api.withNotification(apiCall, successMsg, errorPrefix)` wrapper method
   - Refactored 11 functions to use wrapper instead of try-catch boilerplate
   - Functions refactored: togglePlaylist, downloadChannel, downloadPlaylist, startDownloads, retryFailedDownloads, refreshPlaylist, startScheduler, stopScheduler, deleteCookies, deleteYouTubeApiKey, saveLogConfig, deleteProfile, handleAddProfile, handleEditProfile
@@ -901,6 +910,7 @@ open http://localhost:8189
   - Changed final command preview heading to "yt-dlp Command Used for This Channel"
 
 **Files Modified:**
+- `REFACTORING_TARGETS_V2.md` - NEW: Second round refactoring analysis with 8 new patterns
 - `public/js/app.js` - Added openModal/closeModal utilities, refactored 8 modal functions, added api.withNotification() wrapper, refactored 11 functions to use wrapper
 - `REFACTORING_TARGETS.md` - Updated with modal utilities and API error handler completion status
 - `src/database.js` - Added migration helper method, refactored all migrations to use helper, added profiles verbose/filename_format columns, created config table
@@ -914,10 +924,12 @@ open http://localhost:8189
 - `public/js/app.js` - Complete refactor of updateComputedOptions() for hierarchy, conflict detection, argument maps
 
 **Technical Achievements:**
+- Second round analysis identified 8 new refactoring opportunities (200-225 lines potential)
+- Combined refactoring potential: 446-471 lines (15-16% of entire codebase)
 - Generic modal utilities provide consistent pattern for all future modals
 - API error handler provides consistent error messages and cleaner code
 - Database migration helper reduces code duplication and improves maintainability
-- 246 total lines saved through refactoring (Delete Modals + Migrations)
+- 246 total lines saved through Phase 1 refactoring (Delete Modals + Migrations)
 - 19 functions refactored for better error handling and modal management consistency
 - Frontend preview logic now 100% matches backend download logic
 - Complete visibility into option conflicts and overrides
