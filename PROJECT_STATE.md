@@ -822,6 +822,13 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-02-01):**
+- **IMPLEMENTED: API Error Handler Wrapper** (CODE QUALITY)
+  - Created `api.withNotification(apiCall, successMsg, errorPrefix)` wrapper method
+  - Refactored 11 functions to use wrapper instead of try-catch boilerplate
+  - Functions refactored: togglePlaylist, downloadChannel, downloadPlaylist, startDownloads, retryFailedDownloads, refreshPlaylist, startScheduler, stopScheduler, deleteCookies, deleteYouTubeApiKey, saveLogConfig, deleteProfile, handleAddProfile, handleEditProfile
+  - More concise function bodies with consistent error message format
+  - Complex functions with finally blocks kept original pattern for clarity
+  - Improves maintainability and consistency across codebase
 - **IMPLEMENTED: Database Migration Helper** (CODE QUALITY)
   - Created `addColumnIfMissing(table, column, definition)` helper method in DB class
   - Replaced all 22 migration blocks with single-line calls
@@ -887,6 +894,8 @@ open http://localhost:8189
   - Changed final command preview heading to "yt-dlp Command Used for This Channel"
 
 **Files Modified:**
+- `public/js/app.js` - Added api.withNotification() wrapper, refactored 11 functions to use wrapper
+- `REFACTORING_TARGETS.md` - Updated with API error handler completion status
 - `src/database.js` - Added migration helper method, refactored all migrations to use helper, added profiles verbose/filename_format columns, created config table
 - `REFACTORING_TARGETS.md` - Updated with completed migration refactor status and actual line savings
 - `src/server.js` - Updated profile endpoints, added config API, added ytdlp injection for handle resolution
@@ -898,8 +907,10 @@ open http://localhost:8189
 - `public/js/app.js` - Complete refactor of updateComputedOptions() for hierarchy, conflict detection, argument maps
 
 **Technical Achievements:**
+- API error handler provides consistent error messages and cleaner code
 - Database migration helper reduces code duplication and improves maintainability
 - 246 total lines saved through refactoring (Delete Modals + Migrations)
+- 11 functions refactored for better error handling consistency
 - Frontend preview logic now 100% matches backend download logic
 - Complete visibility into option conflicts and overrides
 - Smart filesystem flag handling prevents incompatible combinations
