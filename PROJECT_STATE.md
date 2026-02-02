@@ -822,6 +822,13 @@ open http://localhost:8189
 > **Note**: Run `git log --oneline -10` to see latest commits
 
 **Latest Session Changes (2026-02-01):**
+- **IMPLEMENTED: Modal Control Utilities** (CODE QUALITY)
+  - Created generic `openModal(modalId, onOpen)` and `closeModal(modalId, onClose)` utilities
+  - Refactored 8 modal control functions to use generic utilities
+  - Functions: showAddChannelModal, closeAddChannelModal, closeChannelModal, closeVideoModal, closePlaylistModal, showAddProfileModal, closeAddProfileModal, closeEditProfileModal
+  - Utilities support optional callbacks for custom behavior (focus input, reset form)
+  - Infrastructure in place for future modals - no need to write custom open/close functions
+  - Improves consistency and reduces boilerplate for modal management
 - **IMPLEMENTED: API Error Handler Wrapper** (CODE QUALITY)
   - Created `api.withNotification(apiCall, successMsg, errorPrefix)` wrapper method
   - Refactored 11 functions to use wrapper instead of try-catch boilerplate
@@ -894,8 +901,8 @@ open http://localhost:8189
   - Changed final command preview heading to "yt-dlp Command Used for This Channel"
 
 **Files Modified:**
-- `public/js/app.js` - Added api.withNotification() wrapper, refactored 11 functions to use wrapper
-- `REFACTORING_TARGETS.md` - Updated with API error handler completion status
+- `public/js/app.js` - Added openModal/closeModal utilities, refactored 8 modal functions, added api.withNotification() wrapper, refactored 11 functions to use wrapper
+- `REFACTORING_TARGETS.md` - Updated with modal utilities and API error handler completion status
 - `src/database.js` - Added migration helper method, refactored all migrations to use helper, added profiles verbose/filename_format columns, created config table
 - `REFACTORING_TARGETS.md` - Updated with completed migration refactor status and actual line savings
 - `src/server.js` - Updated profile endpoints, added config API, added ytdlp injection for handle resolution
@@ -907,10 +914,11 @@ open http://localhost:8189
 - `public/js/app.js` - Complete refactor of updateComputedOptions() for hierarchy, conflict detection, argument maps
 
 **Technical Achievements:**
+- Generic modal utilities provide consistent pattern for all future modals
 - API error handler provides consistent error messages and cleaner code
 - Database migration helper reduces code duplication and improves maintainability
 - 246 total lines saved through refactoring (Delete Modals + Migrations)
-- 11 functions refactored for better error handling consistency
+- 19 functions refactored for better error handling and modal management consistency
 - Frontend preview logic now 100% matches backend download logic
 - Complete visibility into option conflicts and overrides
 - Smart filesystem flag handling prevents incompatible combinations
