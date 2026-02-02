@@ -382,6 +382,82 @@ This is a functional YouTube download manager built with Node.js, Express, and S
 
 ---
 
+## Test Coverage Status
+
+### ✅ Tested Features (46 unit tests)
+
+**Database Operations** (6 tests):
+- Channel CRUD with SponsorBlock options
+- Database migrations and schema validation
+
+**SponsorBlock Integration** (6 tests):
+- Flag generation for mark/remove modes
+- Category validation and parsing
+- Custom args integration
+
+**API Endpoints** (23 tests):
+- Profile management (GET, POST, PUT, DELETE)
+- Channel management (GET, POST, PUT, DELETE)
+- Playlist operations (GET, PUT, DELETE videos)
+- Video operations (GET, DELETE single/bulk)
+- Stats endpoints (global, per-channel, recent downloads)
+- Download control (start, retry, status, queue)
+- Request validation and error handling
+
+**Performance Optimizations** (11 tests):
+- Stats caching (cache hit/miss, TTL, invalidation)
+- Automatic cache invalidation on data changes
+- Channel stats caching
+- Handle resolution strategy (documented)
+
+### ❌ Features Needing Tests
+
+**Frontend Logic**:
+- Option hierarchy and conflict detection (4-level system)
+- Frontend preview computation (updateComputedOptions)
+- Argument tokenization for quoted values
+- Custom/profile argument Maps for complete values
+- Filesystem flag exclusivity logic
+- Debounced polling behavior (complex - needs browser simulation)
+
+**Backend Features**:
+- Handle resolution via yt-dlp extraction (needs yt-dlp mocking)
+- YouTube API integration with quota tracking
+- Download manager option hierarchy (buildDownloadOptions)
+- Playlist download with proper option inheritance
+- Cookie management and validation
+- Scheduler service for automatic downloads
+
+**Integration Scenarios**:
+- Complete download workflow (enumeration → download → metadata)
+- Profile assignment and override behavior
+- Channel toggle override cascading
+- Archive sync on video deletion
+- Failed download retry with archive cleanup
+
+**UI Interactions**:
+- Browser state preservation (localStorage)
+- Modal workflows (add/edit channel, profile, etc.)
+- Pagination and filtering
+- Real-time progress updates
+
+### 📋 Testing Philosophy
+
+Following yt-dlp's proven approach:
+- **95% Unit Tests**: Fast, isolated, CI-friendly
+- **5% Integration Tests**: Real yt-dlp execution, local only
+- **Priority**: Test business logic and data integrity first
+- **Defer**: Complex UI interactions until needed
+- **Goal**: Prevent regressions in core functionality
+
+**When to Add Tests**:
+1. Before fixing bugs (write failing test first)
+2. After adding complex logic (option hierarchy, caching)
+3. For critical paths (downloads, data mutations)
+4. When refactoring (ensure behavior stays same)
+
+---
+
 ## Development History & Context
 
 ### Version 1.3.0 - Comprehensive API Test Coverage (2026-01-31)
