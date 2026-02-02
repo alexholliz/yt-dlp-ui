@@ -730,7 +730,7 @@ async function viewVideo(videoId) {
         ${video.download_status === 'failed' || video.download_status === 'completed' ? `
           <button class="btn btn-secondary" onclick="forceRedownload('${video.video_id}')">Force Redownload</button>
         ` : ''}
-        <button class="btn btn-danger" onclick="deleteVideo('${video.video_id}')">Delete Video</button>
+        <button class="btn btn-danger" onclick="openDeleteVideoModal('${video.video_id}')">Delete Video</button>
       </div>
     `;
   } catch (err) {
@@ -738,18 +738,40 @@ async function viewVideo(videoId) {
   }
 }
 
-async function deleteVideo(videoId) {
-  if (!confirm('Delete this video? This will permanently delete the file from disk and remove it from the database.')) return;
-  
+// Delete Video Modal
+let videoToDelete = null;
+
+function openDeleteVideoModal(videoId) {
+  videoToDelete = videoId;
+  document.getElementById('delete-video-modal').style.display = 'flex';
+  document.getElementById('delete-video-files-toggle').checked = false;
+}
+
+function closeDeleteVideoModal() {
+  document.getElementById('delete-video-modal').style.display = 'none';
+  videoToDelete = null;
+}
+
+async function confirmDeleteVideo() {
+  if (!videoToDelete) return;
+
+  const deleteFiles = document.getElementById('delete-video-files-toggle').checked;
+
   try {
-    await api.delete(`/api/videos/${videoId}`);
-    showNotification('Video and files deleted', 'success');
+    await api.delete(`/api/videos/${videoToDelete}?deleteFiles=${deleteFiles}`);
+    showNotification('Video deleted successfully', 'success');
+    closeDeleteVideoModal();
     closeVideoModal();
     loadHistory();
     loadQueue();
   } catch (err) {
     showNotification('Failed to delete video: ' + err.message, 'error');
   }
+}
+
+async function deleteVideo(videoId) {
+  // Legacy function - redirect to modal
+  openDeleteVideoModal(videoId);
 }
 
 async function forceRedownload(videoId) {
@@ -2014,7 +2036,7 @@ async function viewPlaylist(playlistId) {
         </tbody>
       </table>
       <div class="button-group" style="margin-top: 1rem; justify-content: flex-end;">
-        <button class="btn btn-danger" onclick="deleteAllPlaylistVideos(${playlistId})">Delete All Videos</button>
+        <button class="btn btn-danger" onclick="openDeletePlaylistVideosModal(${playlistId})">Delete All Videos</button>
       </div>
     `;
   } catch (err) {
@@ -2030,6 +2052,42 @@ async function deleteAllPlaylistVideos(playlistId) {
     showNotification(result.message, 'success');
     closePlaylistModal();
     loadHistory();
+    loadStats();
+    // Refresh channel view if it's open
+    const channelModal = document.getElementById('channel-modal');
+    if (channelModal.style.display === 'flex') {
+      const channelId = result.channel_id;
+      if (channelId) viewChannel(channelId);
+    }
+  } catch (err) {
+    showNotification('Failed to delete videos: ' + err.message, 'error');
+  }
+}
+
+// Delete Playlist Videos Modal
+let playlistToDelete = null;
+
+function openDeletePlaylistVideosModal(playlistId) {
+  playlistToDelete = playlistId;
+  document.getElementById('delete-playlist-videos-modal').style.display = 'flex';
+  document.getElementById('delete-playlist-files-toggle').checked = false;
+}
+
+function closeDeletePlaylistVideosModal() {
+  document.getElementById('delete-playlist-videos-modal').style.display = 'none';
+  playlistToDelete = null;
+}
+
+async function confirmDeletePlaylistVideos() {
+  if (!playlistToDelete) return;
+
+  const deleteFiles = document.getElementById('delete-playlist-files-toggle').checked;
+
+  try {
+    const result = await api.delete(`/api/playlists/${playlistToDelete}/videos?deleteFiles=${deleteFiles}`);
+    showNotification(`Deleted ${result.deleted_count} videos`, 'success');
+    closeDeletePlaylistVideosModal();
+    closePlaylistModal();
     loadStats();
     // Refresh channel view if it's open
     const channelModal = document.getElementById('channel-modal');

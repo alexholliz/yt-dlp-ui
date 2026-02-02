@@ -457,6 +457,8 @@ db.ready.then(() => {
   // Delete all videos in a playlist
   app.delete('/api/playlists/:id/videos', (req, res) => {
     try {
+      const deleteFiles = req.query.deleteFiles === 'true';
+      
       const playlist = db.getPlaylist(req.params.id);
       if (!playlist) {
         return res.status(404).json({ error: 'Playlist not found' });
@@ -467,40 +469,67 @@ db.ready.then(() => {
       let deletedFiles = 0;
       let playlistDir = null;
 
-      // Delete each video file and collect the playlist directory
-      videos.forEach(video => {
-        if (video.file_path && fs.existsSync(video.file_path)) {
-          try {
-            // Track the playlist directory (parent of the video file)
-            if (!playlistDir && video.file_path) {
-              playlistDir = path.dirname(video.file_path);
-            }
-
-            // Delete video file
-            fs.unlinkSync(video.file_path);
-            deletedFiles++;
-
-            // Delete .info.json
-            const infoJsonPath = video.file_path.replace(/\.[^.]+$/, '.info.json');
-            if (fs.existsSync(infoJsonPath)) {
-              fs.unlinkSync(infoJsonPath);
-            }
-
-            // Delete thumbnails
-            const thumbExtensions = ['.jpg', '.png', '.webp'];
-            const baseFilePath = video.file_path.replace(/\.[^.]+$/, '');
-            thumbExtensions.forEach(ext => {
-              const thumbPath = baseFilePath + ext;
-              if (fs.existsSync(thumbPath)) {
-                fs.unlinkSync(thumbPath);
+      // Delete each video file if requested
+      if (deleteFiles) {
+        videos.forEach(video => {
+          if (video.file_path && fs.existsSync(video.file_path)) {
+            try {
+              // Track the playlist directory (parent of the video file)
+              if (!playlistDir && video.file_path) {
+                playlistDir = path.dirname(video.file_path);
               }
-            });
-          } catch (fileErr) {
-            logger.error(`Failed to delete file ${video.file_path}:`, fileErr.message);
+
+              // Delete video file
+              fs.unlinkSync(video.file_path);
+              deletedFiles++;
+
+              // Delete .info.json
+              const infoJsonPath = video.file_path.replace(/\.[^.]+$/, '.info.json');
+              if (fs.existsSync(infoJsonPath)) {
+                fs.unlinkSync(infoJsonPath);
+              }
+
+              // Delete thumbnails
+              const thumbExtensions = ['.jpg', '.png', '.webp'];
+              const baseFilePath = video.file_path.replace(/\.[^.]+$/, '');
+              thumbExtensions.forEach(ext => {
+                const thumbPath = baseFilePath + ext;
+                if (fs.existsSync(thumbPath)) {
+                  fs.unlinkSync(thumbPath);
+                }
+              });
+            } catch (fileErr) {
+              logger.error(`Failed to delete file ${video.file_path}:`, fileErr.message);
+            }
+          }
+        });
+
+        // Delete the playlist directory if it exists and is empty (or only has metadata files)
+        if (playlistDir && fs.existsSync(playlistDir)) {
+          try {
+            const remainingFiles = fs.readdirSync(playlistDir);
+            // Only delete if empty or only contains .info.json files
+            const nonMetadataFiles = remainingFiles.filter(f => !f.endsWith('.info.json') && !f.endsWith('.jpg') && !f.endsWith('.png'));
+            if (nonMetadataFiles.length === 0) {
+              // Delete any remaining metadata files
+              remainingFiles.forEach(file => {
+                const filePath = path.join(playlistDir, file);
+                if (fs.existsSync(filePath)) {
+                  fs.unlinkSync(filePath);
+                }
+              });
+              // Remove the directory
+              fs.rmdirSync(playlistDir);
+              logger.info(`Deleted playlist directory: ${playlistDir}`);
+            }
+          } catch (dirErr) {
+            logger.error(`Failed to delete playlist directory:`, dirErr.message);
           }
         }
+      }
 
-        // Remove from download archive
+      // Always remove from download archive (even if not deleting files)
+      videos.forEach(video => {
         if (fs.existsSync(archivePath)) {
           try {
             const archiveContent = fs.readFileSync(archivePath, 'utf8');
@@ -513,38 +542,20 @@ db.ready.then(() => {
         }
       });
 
-      // Delete the playlist directory if it exists and is empty (or only has metadata files)
-      if (playlistDir && fs.existsSync(playlistDir)) {
-        try {
-          const remainingFiles = fs.readdirSync(playlistDir);
-          // Only delete if empty or only contains .info.json files
-          const nonMetadataFiles = remainingFiles.filter(f => !f.endsWith('.info.json') && !f.endsWith('.jpg') && !f.endsWith('.png'));
-          if (nonMetadataFiles.length === 0) {
-            // Delete any remaining metadata files
-            remainingFiles.forEach(file => {
-              const filePath = path.join(playlistDir, file);
-              if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-              }
-            });
-            // Remove the directory
-            fs.rmdirSync(playlistDir);
-            logger.info(`Deleted playlist directory: ${playlistDir}`);
-          }
-        } catch (dirErr) {
-          logger.error(`Failed to delete playlist directory:`, dirErr.message);
-        }
-      }
-
       // Delete from database
       db.db.run('DELETE FROM videos WHERE playlist_id = ?', [req.params.id]);
       db.save();
       db.invalidateStatsCache(); // Invalidate cache on data change
 
-      logger.info(`Deleted ${videos.length} videos from playlist ${playlist.playlist_title}`);
+      const message = deleteFiles 
+        ? `Deleted ${videos.length} videos and ${deletedFiles} files`
+        : `Removed ${videos.length} videos from database (files preserved)`;
+      
+      logger.info(message);
       res.json({ 
         success: true, 
-        message: `Deleted ${videos.length} videos and ${deletedFiles} files`,
+        message,
+        deleted_count: videos.length,
         channel_id: playlist.channel_id
       });
     } catch (err) {
@@ -565,6 +576,8 @@ db.ready.then(() => {
   // Delete a single video
   app.delete('/api/videos/:id', (req, res) => {
     try {
+      const deleteFiles = req.query.deleteFiles === 'true';
+      
       // Get video info first to find file path
       const videoResult = db.db.exec('SELECT * FROM videos WHERE video_id = ?', [req.params.id]);
       
@@ -574,8 +587,8 @@ db.ready.then(() => {
       
       const video = db.rowToObject(videoResult[0].columns, videoResult[0].values[0]);
       
-      // Delete file from disk if it exists
-      if (video.file_path && fs.existsSync(video.file_path)) {
+      // Delete file from disk if requested and file exists
+      if (deleteFiles && video.file_path && fs.existsSync(video.file_path)) {
         try {
           fs.unlinkSync(video.file_path);
           logger.info(`Deleted file: ${video.file_path}`);
@@ -622,7 +635,8 @@ db.ready.then(() => {
       db.save();
       db.invalidateStatsCache(); // Invalidate cache on data change
       
-      res.json({ success: true, message: 'Video and files deleted' });
+      const message = deleteFiles ? 'Video and files deleted' : 'Video removed from database (files preserved)';
+      res.json({ success: true, message });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
