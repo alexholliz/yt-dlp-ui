@@ -6,8 +6,8 @@ This document identifies duplicate code patterns in the codebase and prioritizes
 
 **Last Updated:** 2026-02-01  
 **Total Potential Savings:** ~286 lines (~8-10% of codebase)  
-**Completed Savings**: 246 lines code + quality improvements  
-**Remaining Potential**: ~50 lines (modal controls + table helpers)
+**Completed Savings**: 246 lines + infrastructure improvements  
+**Remaining Potential**: ~8 lines (table empty state helper)
 
 ---
 
@@ -19,7 +19,7 @@ This document identifies duplicate code patterns in the codebase and prioritizes
 | 2 | Modal HTML Structure | 7 | 18 | **126 lines** | 🟠 HIGH | ❌ Not Started |
 | 3 | API Error Handling | 35 | 2 | **70 lines** | 🟠 HIGH | ✅ **COMPLETED** |
 | 4 | Form Handlers | 3 | 25 | **75 lines** | 🟡 MEDIUM | ❌ Not Started |
-| 5 | Modal Control Functions | 14 | 3 | **42 lines** | 🟡 MEDIUM | ❌ Not Started |
+| 5 | Modal Control Functions | 14 | 3 | **42 lines** | 🟡 MEDIUM | ✅ **COMPLETED** |
 | 6 | Table Rendering | 4 | 2 | **8 lines** | 🟢 LOW | ❌ Not Started |
 | 7 | Delete Modals | 3 | - | **139 lines** | - | ✅ **COMPLETED** |
 
@@ -299,11 +299,28 @@ class FormHandler {
 
 ---
 
-### 5. Modal Control Functions (42 lines potential savings)
+### 5. Modal Control Functions ✅ COMPLETED (Infrastructure improvement)
+
+**Status**: Completed 2026-02-02  
+**Actual Result**: Added reusable utilities, refactored 6 modal functions
+
+**Implementation**:
+- Created generic `openModal(modalId, onOpen)` and `closeModal(modalId, onClose)` utilities
+- Refactored 6 modal control functions to use utilities:
+  - showAddChannelModal → openModal with focus callback
+  - closeAddChannelModal → closeModal with form reset callback
+  - closeChannelModal → closeModal
+  - closeVideoModal → closeModal
+  - closePlaylistModal → closeModal
+  - showAddProfileModal → openModal with focus callback
+  - closeAddProfileModal → closeModal with form reset callback
+  - closeEditProfileModal → closeModal with form reset callback
+- Utilities support optional callbacks for custom behavior (focus, reset, etc.)
+- Infrastructure in place for future modals
 
 **Already partially addressed by Delete Modal refactor**, but 6 other modals still use individual functions.
 
-**Current Pattern:**
+**Original Pattern:**
 ```javascript
 function closeChannelModal() {
   document.getElementById('channel-modal').style.display = 'none';
@@ -336,9 +353,14 @@ function showVideoModal(videoId) {
 }
 ```
 
-**Impact:** 12 functions × 3-4 lines = ~42 lines reduced to 2 utility functions + inline calls
+**Impact:** 
+- 8 modal functions refactored to use 2 generic utilities
+- Consistent modal open/close pattern across codebase
+- Infrastructure for future modals (no need to write custom functions)
+- **Code quality**: Improved maintainability and extensibility
+- Net line change: +11 lines (utilities add value for future use)
 
-**Recommendation:** ⭐⭐⭐ MEDIUM-HIGH - Easy to implement, moderate impact
+**Note**: Functions like viewChannel() and viewPlaylist() with complex opening logic kept original pattern.
 
 ---
 
@@ -382,7 +404,7 @@ function renderEmptyState(tbody, colspan, message = 'No items found') {
 1. ✅ Delete Modal Template - DONE (139 lines saved)
 2. ✅ Database Migration Helper - DONE (107 lines saved)
 3. ✅ API Error Handler - DONE (quality improvement, 11 functions refactored)
-4. ⬜ Modal Control Utilities - 20 min, moderate impact
+4. ✅ Modal Control Utilities - DONE (infrastructure improvement, 8 functions refactored)
 5. ⬜ Table Empty State Utility - 10 min, low impact
 
 ### **Phase 2: Structural Improvements** (Est: 2-4 hours)
@@ -680,8 +702,8 @@ function renderEmptyState(tbody, colspan, message = 'No items found') {
 
 **Total Est. Time:** 2 hours  
 **Total Planned:** ~211 lines  
-**Actual Completed:** 246 lines + quality improvements (Delete Modal: 139 + Migration Helper: 107 + API Error Handler: quality focus)  
-**Remaining Quick Wins:** Modal Control (42 lines) + Table Empty State (8 lines) = ~50 lines
+**Actual Completed:** 246 lines + quality/infrastructure improvements (Delete Modal: 139 + Migration Helper: 107 + API Error Handler: quality + Modal Utilities: infrastructure)  
+**Remaining Quick Wins:** Table Empty State (8 lines, 10 min)
 
 ---
 

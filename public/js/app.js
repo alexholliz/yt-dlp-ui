@@ -2035,23 +2035,37 @@ async function saveLogConfig() {
   );
 }
 
+// Modal control utilities - generic helpers for opening/closing modals
+function openModal(modalId, onOpen = null) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    if (onOpen) onOpen();
+    modal.style.display = 'flex';
+  }
+}
+
+function closeModal(modalId, onClose = null) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.style.display = 'none';
+    if (onClose) onClose();
+  }
+}
+
 function showAddChannelModal() {
-  document.getElementById('add-channel-modal').style.display = 'flex';
-  document.getElementById('channel-url').focus();
+  openModal('add-channel-modal', () => document.getElementById('channel-url').focus());
 }
 
 function closeAddChannelModal() {
-  document.getElementById('add-channel-modal').style.display = 'none';
-  // Reset form
-  document.getElementById('add-channel-form').reset();
+  closeModal('add-channel-modal', () => document.getElementById('add-channel-form').reset());
 }
 
 function closeChannelModal() {
-  document.getElementById('channel-modal').style.display = 'none';
+  closeModal('channel-modal');
 }
 
 function closeVideoModal() {
-  document.getElementById('video-modal').style.display = 'none';
+  closeModal('video-modal');
 }
 
 async function viewPlaylist(playlistId) {
@@ -2168,17 +2182,15 @@ async function confirmDeletePlaylistVideos() {
 }
 
 function closePlaylistModal() {
-  document.getElementById('playlist-modal').style.display = 'none';
+  closeModal('playlist-modal');
 }
 
 function showAddProfileModal() {
-  document.getElementById('add-profile-modal').style.display = 'flex';
-  document.getElementById('profile-name').focus();
+  openModal('add-profile-modal', () => document.getElementById('profile-name').focus());
 }
 
 function closeAddProfileModal() {
-  document.getElementById('add-profile-modal').style.display = 'none';
-  document.getElementById('add-profile-form').reset();
+  closeModal('add-profile-modal', () => document.getElementById('add-profile-form').reset());
 }
 
 function applyPreset() {
@@ -2249,8 +2261,7 @@ async function editProfile(profileId) {
 }
 
 function closeEditProfileModal() {
-  document.getElementById('edit-profile-modal').style.display = 'none';
-  document.getElementById('edit-profile-form').reset();
+  closeModal('edit-profile-modal', () => document.getElementById('edit-profile-form').reset());
 }
 
 function applyEditPreset() {
