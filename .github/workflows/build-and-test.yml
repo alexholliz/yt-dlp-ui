@@ -102,10 +102,13 @@ jobs:
             -e SESSION_SECRET=ci-test-secret-not-for-production \
             yt-dlp-ui:prod
           for i in $(seq 1 30); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8190/login)
+            # Allow curl to fail (connection refused) while server is starting;
+            # capture status without triggering bash -e on a non-zero exit code.
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8190/login 2>/dev/null) || true
             [ "$status" = "200" ] && break
             sleep 1
           done
+          [ "$status" = "200" ] || { echo "Auth server did not start within 30s"; exit 1; }
 
       - name: Verify all API endpoints blocked without session (auth configured)
         run: |
@@ -131,7 +134,7 @@ jobs:
           check_blocked DELETE /api/cookies
           check_blocked POST /api/cookies/validate
           check_blocked GET  /api/youtube-api/key
-          check_blocked PUT  /api/youtube-api/key
+          check_blocked POST /api/youtube-api/key
           check_blocked DELETE /api/youtube-api/key
           check_blocked GET  /api/youtube-api/quota
           check_blocked GET  /api/config
