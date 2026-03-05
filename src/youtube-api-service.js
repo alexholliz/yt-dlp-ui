@@ -75,12 +75,30 @@ class YouTubeApiService {
   }
 
   _nextMidnightPacific() {
+    // YouTube API quotas reset at midnight Pacific Time (America/Los_Angeles),
+    // which is UTC-8 (PST, Nov–Mar) or UTC-7 (PDT, Mar–Nov).
+    // We find the exact UTC instant for "tomorrow 00:00:00 PT" by probing
+    // both offsets and picking the one that lands on midnight in PT.
+    const tz = 'America/Los_Angeles';
     const now = new Date();
-    const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-    const tomorrow = new Date(pacificTime);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return tomorrow.toISOString();
+
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(now);
+    const y = +parts.find(p => p.type === 'year').value;
+    const m = +parts.find(p => p.type === 'month').value;
+    const d = +parts.find(p => p.type === 'day').value;
+
+    // Try PST (UTC-8) then PDT (UTC-7) until one resolves to midnight in PT
+    for (const utcHour of [8, 7]) {
+      const candidate = new Date(Date.UTC(y, m - 1, d + 1, utcHour, 0, 0, 0));
+      const hour = +new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour: 'numeric', hourCycle: 'h23'
+      }).format(candidate);
+      if (hour === 0) return candidate.toISOString();
+    }
+    // Unreachable in practice
+    return new Date(Date.UTC(y, m - 1, d + 2, 8, 0, 0, 0)).toISOString();
   }
 
   trackQuotaCost(operation, count = 1) {
