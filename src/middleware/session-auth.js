@@ -70,16 +70,21 @@ function createAuthGuard() {
 }
 
 /** POST /auth/login handler */
+/** POST /auth/login handler */
 function loginHandler(req, res) {
   const username = process.env.BASIC_AUTH_USERNAME;
   const password = process.env.BASIC_AUTH_PASSWORD;
 
   if (req.body.username === username && req.body.password === password) {
     req.session.authenticated = true;
-    const redirect = req.body.next || '/';
-    // Prevent open redirect: only allow same-origin relative paths
-    const safe = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
-    return res.redirect(safe);
+    req.session.save((err) => {
+      if (err) { logger.error('Session save error on login:', err); return res.redirect('/login?error=1'); }
+      const redirect = req.body.next || '/';
+      // Prevent open redirect: only allow same-origin relative paths
+      const safe = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/';
+      res.redirect(safe);
+    });
+    return;
   }
 
   res.redirect('/login?error=1');
@@ -87,7 +92,10 @@ function loginHandler(req, res) {
 
 /** POST /auth/logout handler */
 function logoutHandler(req, res) {
-  req.session.destroy(() => res.redirect('/login'));
+  req.session.destroy((err) => {
+    if (err) logger.error('Session destroy error on logout:', err);
+    res.redirect('/login');
+  });
 }
 
 module.exports = { createSessionMiddleware, createAuthGuard, loginHandler, logoutHandler };

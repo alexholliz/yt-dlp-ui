@@ -28,7 +28,6 @@ const PORT = process.env.PORT || 8189;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/yt-dlp-ui.sqlite');
 const DOWNLOADS_PATH = process.env.DOWNLOADS_PATH || path.join(__dirname, '../downloads');
 const COOKIES_PATH = process.env.COOKIES_PATH || path.join(__dirname, '../config/cookies.txt');
-const CONFIG_PATH = process.env.CONFIG_PATH || path.dirname(COOKIES_PATH);
 
 // Ensure directories exist
 [path.dirname(DB_PATH), DOWNLOADS_PATH, path.dirname(COOKIES_PATH)].forEach(dir => {

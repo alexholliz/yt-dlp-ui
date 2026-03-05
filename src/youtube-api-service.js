@@ -51,14 +51,24 @@ class YouTubeApiService {
 
   saveApiKey(apiKey) {
     const trimmed = apiKey.trim();
-    this.db.setConfig(DB_KEY_API_KEY, encrypt(trimmed));
+    try {
+      this.db.setConfig(DB_KEY_API_KEY, encrypt(trimmed));
+    } catch (err) {
+      logger.error('Failed to save YouTube API key:', err);
+      throw err;
+    }
     this.apiKey = trimmed;
     logger.info('YouTube API key saved');
     return true;
   }
 
   deleteApiKey() {
-    this.db.setConfig(DB_KEY_API_KEY, null);
+    try {
+      this.db.setConfig(DB_KEY_API_KEY, null);
+    } catch (err) {
+      logger.error('Failed to delete YouTube API key:', err);
+      throw err;
+    }
     this.apiKey = null;
     logger.info('YouTube API key deleted');
     return true;
@@ -120,6 +130,7 @@ class YouTubeApiService {
   }
 
   getQuotaStatus() {
+    if (!this.quotaData) return { used: 0, limit: 10000, remaining: 10000, resetTime: null };
     // Re-read from DB to pick up any reset that happened since last load
     const stored = this.db.getConfig(DB_KEY_QUOTA);
     if (stored) {
