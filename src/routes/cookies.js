@@ -29,7 +29,7 @@ module.exports = function cookiesRouter({ ytdlp, COOKIES_PATH }) {
       return res.status(400).json({ error: 'Invalid cookie format', details: validation.errors });
     }
 
-    fs.writeFileSync(COOKIES_PATH, content, 'utf8');
+    fs.writeFileSync(COOKIES_PATH, content, { encoding: 'utf8', mode: 0o600 });
     res.json({ success: true, message: 'Cookies saved successfully', warnings: validation.warnings });
   }));
 
