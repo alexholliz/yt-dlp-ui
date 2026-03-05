@@ -25,12 +25,15 @@ const configRouter = require('./routes/config');
 
 const app = express();
 const PORT = process.env.PORT || 8189;
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/yt-dlp-ui.sqlite');
+// CONFIG_PATH is the single appdata root — DB, logs, and cookies all live here.
+// Individual paths can still be overridden via their own env vars if needed.
+const CONFIG_PATH   = process.env.CONFIG_PATH   || path.join(__dirname, '../config');
+const DB_PATH       = process.env.DB_PATH       || path.join(CONFIG_PATH, 'yt-dlp-ui.sqlite');
 const DOWNLOADS_PATH = process.env.DOWNLOADS_PATH || path.join(__dirname, '../downloads');
-const COOKIES_PATH = process.env.COOKIES_PATH || path.join(__dirname, '../config/cookies.txt');
+const COOKIES_PATH  = process.env.COOKIES_PATH  || path.join(CONFIG_PATH, 'cookies.txt');
 
 // Ensure directories exist
-[path.dirname(DB_PATH), DOWNLOADS_PATH, path.dirname(COOKIES_PATH)].forEach(dir => {
+[CONFIG_PATH, DOWNLOADS_PATH].forEach(dir => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

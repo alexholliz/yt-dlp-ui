@@ -4,7 +4,9 @@ const fs = require('fs');
 
 // Default log level, can be overridden by database config
 let LOG_LEVEL = process.env.LOG_LEVEL || 'error';
-const LOG_DIR = path.join(process.env.DB_PATH ? path.dirname(process.env.DB_PATH) : path.join(__dirname, '../data'));
+// Log directory: CONFIG_PATH if set, otherwise fall back to DB_PATH's directory or ../data
+const LOG_DIR = process.env.CONFIG_PATH ||
+                (process.env.DB_PATH ? path.dirname(process.env.DB_PATH) : path.join(__dirname, '../data'));
 
 // Ensure log directory exists
 if (!fs.existsSync(LOG_DIR)) {
