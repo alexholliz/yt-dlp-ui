@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-const basicAuth = require('express-basic-auth');
+const { createFullAuthMiddleware, createApiOnlyGuard } = require('./middleware/api-auth');
 const path = require('path');
 const fs = require('fs');
 const DB = require('./database');
@@ -29,8 +29,6 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/yt-dlp-ui.s
 const DOWNLOADS_PATH = process.env.DOWNLOADS_PATH || path.join(__dirname, '../downloads');
 const COOKIES_PATH = process.env.COOKIES_PATH || path.join(__dirname, '../config/cookies.txt');
 const CONFIG_PATH = process.env.CONFIG_PATH || path.dirname(COOKIES_PATH);
-const BASIC_AUTH_USERNAME = process.env.BASIC_AUTH_USERNAME;
-const BASIC_AUTH_PASSWORD = process.env.BASIC_AUTH_PASSWORD;
 
 // Ensure directories exist
 [path.dirname(DB_PATH), DOWNLOADS_PATH, path.dirname(COOKIES_PATH)].forEach(dir => {
@@ -66,22 +64,22 @@ db.ready.then(() => {
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
 
-  // Basic Auth (if configured)
-  if (BASIC_AUTH_USERNAME && BASIC_AUTH_PASSWORD) {
-    logger.info('Basic authentication enabled');
-    app.use(basicAuth({
-      users: { [BASIC_AUTH_USERNAME]: BASIC_AUTH_PASSWORD },
-      challenge: true,
-      realm: 'yt-dlp-ui'
-    }));
-  } else {
-    logger.warn('Basic authentication is disabled - anyone can access the UI');
+  // Authentication
+  // - Credentials configured: Basic Auth protects ALL routes (UI + API).
+  // - No credentials: /api/* is blocked; static UI still loads (shows setup instructions).
+  const fullAuth = createFullAuthMiddleware();
+  if (fullAuth) {
+    app.use(fullAuth);
   }
 
+  // Static files (served before /api routes; protected by fullAuth above if credentials set)
   app.use(express.static(path.join(__dirname, '../public')));
-
-  // Routes
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
+
+  // When no credentials are configured, lock down /api completely.
+  if (!fullAuth) {
+    app.use('/api', createApiOnlyGuard());
+  }
 
   app.use('/api/profiles', profilesRouter(services));
   app.use('/api/channels', channelsRouter(services));
