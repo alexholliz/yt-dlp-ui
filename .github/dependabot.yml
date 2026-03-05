@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # npm packages — security fixes as soon as detected, regular updates weekly
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      # Group all security fixes into a single PR to reduce noise
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      # Group minor/patch non-security bumps together
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions — keep action versions current
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

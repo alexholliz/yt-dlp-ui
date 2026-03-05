@@ -8,7 +8,7 @@ This file contains essential instructions, conventions, and reminders that must 
 
 ## Session Start Checklist
 Read these files first:
-- **`.copilot-instructions.md`** (this file) - AI behavior and conventions
+- **`.github/copilot-instructions.md`** (this file) - AI behavior and conventions
 - `PROJECT_STATE.md` - Project history, architecture, current status
 - `TESTING_CHECKLIST.md` - Testing strategy and patterns
 - `CI_CD_CHECKLIST.md` - Pipeline status and deployment
@@ -51,7 +51,7 @@ Read these files first:
 - Store lessons learned for future sessions
 
 ## Always Remember
-1. **CHECK .copilot-instructions.md FIRST** - Before starting ANY work
+1. **CHECK .github/copilot-instructions.md FIRST** - Before starting ANY work
 2. Read PROJECT_STATE.md at start of every session
 3. Check Test Coverage Status section when adding features
 4. Update docs as you go, not at the end
@@ -59,4 +59,4 @@ Read these files first:
 6. Document decisions for future AI assistants
 7. Write tests for complex logic and critical paths
 8. Keep tests fast and reliable
-9. **RE-CHECK .copilot-instructions.md AFTER WORK** - Verify all instructions followed
+9. **RE-CHECK .github/copilot-instructions.md AFTER WORK** - Verify all instructions followed

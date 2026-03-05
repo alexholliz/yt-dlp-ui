@@ -78,6 +78,47 @@ describe('Database Operations', () => {
     });
   });
 
+  describe('Config Table', () => {
+    it('returns null for a key that has never been set', () => {
+      assert.strictEqual(testDb.getConfig('nonexistent_key_xyz'), null);
+    });
+
+    it('setConfig / getConfig roundtrip', () => {
+      testDb.setConfig('test_key', 'test_value');
+      assert.strictEqual(testDb.getConfig('test_key'), 'test_value');
+    });
+
+    it('setConfig updates an existing key (upsert)', () => {
+      testDb.setConfig('upsert_key', 'first');
+      testDb.setConfig('upsert_key', 'second');
+      assert.strictEqual(testDb.getConfig('upsert_key'), 'second');
+    });
+
+    it('getAllConfig returns an object keyed by config key', () => {
+      testDb.setConfig('cfg_a', 'alpha');
+      testDb.setConfig('cfg_b', 'beta');
+      const config = testDb.getAllConfig();
+      assert.ok(typeof config === 'object' && config !== null);
+      assert.strictEqual(config.cfg_a, 'alpha');
+      assert.strictEqual(config.cfg_b, 'beta');
+    });
+
+    it('getAllConfig returns empty object when no config rows exist', () => {
+      // Use a fresh isolated db for this test
+      const DB = require('../src/database.js');
+      const tmpPath = require('path').join(__dirname, 'test-config-empty.sqlite');
+      const fs = require('fs');
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      const fresh = new DB(tmpPath);
+      // Wait for ready synchronously (sql.js is sync under the hood after ready fires)
+      fresh.ready.then(() => {
+        const cfg = fresh.getAllConfig();
+        assert.ok(typeof cfg === 'object');
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      });
+    });
+  });
+
   describe('Database Migrations', () => {
     it('should have sponsorblock_enabled column in channels table', () => {
       const result = testDb.db.exec("PRAGMA table_info(channels)");

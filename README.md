@@ -11,29 +11,72 @@ A self-hosted web UI for managing yt-dlp downloads with intelligent playlist han
 - **SponsorBlock Integration**: Skip or mark sponsored segments, intros, outros, and more
 - **yt-dlp Profiles**: Reusable download configurations with presets
 - **YouTube Data API v3**: Optional API key for faster channel enumeration
-- **Flexible Organization**: Flat or playlist-organized directory structures  
+- **Flexible Organization**: Flat or playlist-organized directory structures
 - **Download Manager**: Queue system with progress tracking and retry functionality
 - **Automatic Scheduling**: Periodic checking for new content
-- **Cookie Support**: Manage cookies through UI for authenticated downloads
+- **Cookie Support**: Upload a Netscape-format cookie file for authenticated/age-restricted downloads
 - **Advanced Options**: Full yt-dlp command line parameter support
 - **Real-time Status**: Live download progress and queue monitoring
 - **Modern UI**: Tabbed interface with dark theme
+- **Optional Auth**: Session-based login — leave credentials unset to run open on a trusted network
+
+## Quick Start
+
+1. **Add a Channel**: Paste any YouTube channel, playlist, or video URL
+2. **Select Playlists**: Click "View" on a channel to enable specific playlists
+3. **Download**: Click "Download" on a channel or individual playlist
+4. **Monitor**: Check the "Downloads" tab for queue status and progress
+5. **Schedule**: Open Settings to enable automatic periodic downloads
+
+---
 
 ## Installation
 
-### Using Pre-built Image (Recommended)
+### Option 1 — Local development (Node.js)
+
+**Prerequisites**: Node.js 20+, `yt-dlp`, `ffmpeg` all on your PATH.
+
+```bash
+git clone https://github.com/alexholliz/yt-dlp-ui.git
+cd yt-dlp-ui
+npm install
+
+# Optional: enable login
+export BASIC_AUTH_USERNAME=admin
+export BASIC_AUTH_PASSWORD=yourpassword
+export SESSION_SECRET=$(openssl rand -hex 32)
+
+npm start
+# Visit http://localhost:8189
+```
+
+Config, database, and logs land in `./config/` by default. Downloads go to `./downloads/`.
+
+---
+
+### Option 2 — Docker (single container)
 
 ```bash
 docker run -d \
   --name yt-dlp-ui \
   -p 8189:8189 \
-  -v /path/to/config:/config \
+  -v /path/to/appdata:/config \
   -v /path/to/downloads:/downloads \
   -e TZ=America/New_York \
+  -e BASIC_AUTH_USERNAME=admin \
+  -e BASIC_AUTH_PASSWORD=yourpassword \
+  -e SESSION_SECRET=change-me-to-a-long-random-string \
   ghcr.io/yourusername/yt-dlp-ui:latest
 ```
 
-### Docker Compose
+The `/config` volume holds the database (`yt-dlp-ui.sqlite`), `cookies.txt`, and log files.  
+Omit the `BASIC_AUTH_*` and `SESSION_SECRET` vars to run without a login screen (safe on a trusted home network).
+
+---
+
+### Option 3 — Docker Compose
+
+Clone or copy `docker-compose.yml`, then edit the volume paths and credentials:
 
 ```yaml
 version: '3.8'
@@ -44,39 +87,89 @@ services:
     ports:
       - "8189:8189"
     volumes:
-      - /path/to/config:/config
+      - /path/to/appdata:/config
       - /path/to/downloads:/downloads
     environment:
       - TZ=America/New_York
+      - CONFIG_PATH=/config
+      - DOWNLOADS_PATH=/downloads
+      # Remove the three lines below to run without a login screen
+      - BASIC_AUTH_USERNAME=admin
+      - BASIC_AUTH_PASSWORD=yourpassword
+      - SESSION_SECRET=change-me-to-a-long-random-string
     restart: unless-stopped
 ```
 
-### Build from Source
-
 ```bash
-git clone https://github.com/yourusername/yt-dlp-ui.git
-cd yt-dlp-ui
 docker-compose up -d
-```
-
-### Local Development
-
-```bash
-# Prerequisites: Node.js 20+, yt-dlp, ffmpeg
-npm install
-npm run dev
 # Visit http://localhost:8189
 ```
 
-## Quick Start
+To build from source instead of pulling the image, replace the `image:` line with `build: .`.
 
-1. **Add a Channel**: Paste any YouTube channel, playlist, or video URL
-2. **Select Playlists**: Click "View" on a channel to enable specific playlists
-3. **Download**: Click "Download" on a channel or individual playlist
-4. **Monitor**: Check the "Downloads" tab for queue status and progress
-5. **Schedule**: Open Settings to enable automatic periodic downloads
+---
 
-See the [Quick Start Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Quickstart) for a detailed walkthrough.
+### Option 4 — Unraid
+
+1. In the Unraid web UI go to **Apps** and search for **yt-dlp-ui**, or install manually:
+   - Go to **Docker** → **Add Container**
+   - Set **Repository** to `ghcr.io/yourusername/yt-dlp-ui:latest`
+   - Alternatively, paste the raw template URL into the **Template URL** field
+
+2. Configure the paths:
+
+   | Field | Suggested value |
+   |-------|----------------|
+   | Config Directory | `/mnt/user/appdata/yt-dlp-ui` |
+   | Downloads Directory | `/mnt/user/downloads/youtube` |
+
+3. Configure optional auth (leave blank to disable):
+
+   | Variable | Description |
+   |----------|-------------|
+   | `BASIC_AUTH_USERNAME` | Login username |
+   | `BASIC_AUTH_PASSWORD` | Login password |
+   | `SESSION_SECRET` | Long random string — protects sessions and encrypts the YouTube API key at rest |
+
+4. Click **Apply**. The UI is available at `http://YOUR-UNRAID-IP:8189`.
+
+> **Tip**: Generate a strong session secret on any Linux/Mac machine with `openssl rand -hex 32`.
+
+---
+
+## Authentication
+
+Authentication is **opt-in**. The app behaves differently depending on whether credentials are configured:
+
+| Scenario | Behaviour |
+|----------|-----------|
+| No `BASIC_AUTH_USERNAME` / `PASSWORD` set | App is fully open — no login required |
+| Credentials set, no `SESSION_SECRET` | Login works, sessions reset on restart, YouTube API key stored unencrypted |
+| All three vars set | Full auth + persistent sessions + API key encrypted at rest (AES-256-GCM) |
+
+When auth is enabled, all API endpoints return `401` to unauthenticated requests. The login page (`/login`) and static assets are always accessible.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8189` | Web UI port |
+| `TZ` | `UTC` | Container timezone (IANA format, e.g. `America/New_York`) |
+| `CONFIG_PATH` | `/config` | Appdata root — database, cookies.txt, and logs all live here |
+| `DOWNLOADS_PATH` | `/downloads` | Where downloaded videos are saved |
+| `BASIC_AUTH_USERNAME` | *(unset)* | Login username — omit to disable auth |
+| `BASIC_AUTH_PASSWORD` | *(unset)* | Login password |
+| `SESSION_SECRET` | *(unset)* | Session signing key + YouTube API key encryption key |
+| `LOG_LEVEL` | `info` | `error` / `warn` / `info` / `debug` |
+| `YT_DL_WORKER_CONCURRENCY` | `2` | Parallel yt-dlp workers — lower if getting rate-limited |
+
+> **Note**: `DB_PATH` and `COOKIES_PATH` are derived from `CONFIG_PATH` automatically
+> (`$CONFIG_PATH/yt-dlp-ui.sqlite` and `$CONFIG_PATH/cookies.txt`). They can be
+> overridden individually if you need them in different locations.
+
+---
 
 ## Key Features
 
@@ -111,15 +204,7 @@ Configure automatic downloads to check for new content periodically:
 - Manual trigger anytime
 - Runs in background
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8189` | Web UI port |
-| `TZ` | `UTC` | Timezone (IANA format) |
-| `DB_PATH` | `/config/yt-dlp-ui.sqlite` | Database file path |
-| `DOWNLOADS_PATH` | `/downloads` | Download directory |
-| `COOKIES_PATH` | `/config/cookies.txt` | Cookie file path |
+---
 
 ## Documentation
 
@@ -127,7 +212,6 @@ Configure automatic downloads to check for new content periodically:
 - [🚀 Quick Start Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Quickstart) - Get started in 5 minutes
 - [🛠️ Development Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/Development) - Architecture and API docs
 - [🔄 CI/CD Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/CI-CD-Guide) - Pipeline setup and deployment
-- [✨ Features Complete](https://github.com/alexholliz/yt-dlp-ui/wiki/Features-Complete) - Full feature list
 - [🧪 Testing Strategy](TESTING_CHECKLIST.md) - Test architecture and best practices
 - [📊 Project State](PROJECT_STATE.md) - Current status, history, and roadmap
 
@@ -141,12 +225,7 @@ Contributions are welcome! Please:
 4. Push to your fork and submit a pull request
 5. Wait for review and approval
 
-**Note**: Pull requests require:
-- Passing CI tests
-- Code review approval from maintainers
-- Up-to-date with `main` branch
-
-See the [CI/CD Guide](https://github.com/alexholliz/yt-dlp-ui/wiki/CI-CD-Guide) for pipeline details.
+**Note**: Pull requests require passing CI (audit + unit tests + integration sweep) and at least one approving review.
 
 ## Technology Stack
 

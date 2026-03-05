@@ -125,7 +125,15 @@ body {
   opacity: 1;
 }
 
-/* Toggle Switch Component */
+/* Button variant of footer-link (e.g. Sign out) — resets browser button defaults */
+.footer-link--btn {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+
 .toggle-switch {
   position: relative;
   display: inline-block;

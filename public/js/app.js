@@ -1,21 +1,25 @@
 const api = {
+  _check(res) {
+    if (res.status === 401) { window.location.href = '/login'; throw new Error('Session expired'); }
+    return res;
+  },
   async get(url) {
-    const res = await fetch(url);
+    const res = this._check(await fetch(url));
     if (!res.ok) throw new Error((await res.json()).error || 'Request failed');
     return res.json();
   },
   async post(url, data) {
-    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = this._check(await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }));
     if (!res.ok) throw new Error((await res.json()).error || 'Request failed');
     return res.json();
   },
   async put(url, data) {
-    const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = this._check(await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }));
     if (!res.ok) throw new Error((await res.json()).error || 'Request failed');
     return res.json();
   },
   async delete(url) {
-    const res = await fetch(url, { method: 'DELETE' });
+    const res = this._check(await fetch(url, { method: 'DELETE' }));
     if (!res.ok) throw new Error((await res.json()).error || 'Request failed');
     return res.json();
   },

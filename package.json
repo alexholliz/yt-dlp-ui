@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node --test test/database.test.js test/sponsorblock.test.js test/api-endpoints.test.js test/performance.test.js",
+    "test": "node --test test/database.test.js test/sponsorblock.test.js test/api-endpoints.test.js test/performance.test.js test/encryption.test.js test/session-auth.test.js test/youtube-quota.test.js",
     "test:integration": "node --test test/sponsorblock-integration.test.js",
     "test:auth": "node --test test/http-auth.test.js",
     "test:all": "node --test test/*.test.js",
@@ -25,6 +25,7 @@
     "cookie-parser": "^1.4.6",
     "express": "^4.18.2",
     "express-basic-auth": "^1.2.1",
+    "express-session": "^1.18.1",
     "sql.js": "^1.10.3",
     "winston": "^3.19.0"
   },
