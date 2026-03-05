@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-const { createFullAuthMiddleware, createApiOnlyGuard } = require('./middleware/api-auth');
+const { createSessionMiddleware, createAuthGuard, loginHandler, logoutHandler } = require('./middleware/session-auth');
 const path = require('path');
 const fs = require('fs');
 const DB = require('./database');
@@ -63,23 +63,24 @@ db.ready.then(() => {
   app.use(bodyParser.json({ limit: '10mb' })); // Increase limit for large cookie files
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
+  app.use(createSessionMiddleware());
 
-  // Authentication
-  // - Credentials configured: Basic Auth protects ALL routes (UI + API).
-  // - No credentials: /api/* is blocked; static UI still loads (shows setup instructions).
-  const fullAuth = createFullAuthMiddleware();
-  if (fullAuth) {
-    app.use(fullAuth);
+  // Login / logout routes — always accessible (no auth required)
+  app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '../public/login.html')));
+  app.post('/auth/login', loginHandler);
+  app.post('/auth/logout', logoutHandler);
+
+  // Auth guard: when credentials are configured, unauthenticated browsers are
+  // redirected to /login and API clients receive 401.
+  // When no credentials are configured the guard is null and auth is disabled.
+  const authGuard = createAuthGuard();
+  if (authGuard) {
+    app.use(authGuard);
   }
 
-  // Static files (served before /api routes; protected by fullAuth above if credentials set)
+  // Static files (CSS/JS/favicon exempt from auth guard via prefix check in session-auth.js)
   app.use(express.static(path.join(__dirname, '../public')));
   app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
-
-  // When no credentials are configured, lock down /api completely.
-  if (!fullAuth) {
-    app.use('/api', createApiOnlyGuard());
-  }
 
   app.use('/api/profiles', profilesRouter(services));
   app.use('/api/channels', channelsRouter(services));
