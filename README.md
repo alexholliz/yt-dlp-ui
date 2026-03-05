@@ -37,7 +37,7 @@ A self-hosted web UI for managing yt-dlp downloads with intelligent playlist han
 **Prerequisites**: Node.js 20+, `yt-dlp`, `ffmpeg` all on your PATH.
 
 ```bash
-git clone https://github.com/yourusername/yt-dlp-ui.git
+git clone https://github.com/alexholliz/yt-dlp-ui.git
 cd yt-dlp-ui
 npm install
 
