@@ -1,17 +1,14 @@
-const fs = require('fs');
-const path = require('path');
 const logger = require('./logger');
 const { encrypt, decrypt } = require('./utils/encryption');
 
-const DB_CONFIG_KEY = 'youtube_api_key';
+const DB_KEY_API_KEY = 'youtube_api_key';
+const DB_KEY_QUOTA   = 'youtube_api_quota';
 
 class YouTubeApiService {
-  constructor(configPath = '/config') {
-    this.configPath = configPath;
-    this.quotaFile = path.join(configPath, 'youtube-api-quota.json');
+  constructor() {
     this.db = null;
-    this.apiKey = null; // loaded from DB in setDb()
-    this.quotaData = this.loadQuotaData();
+    this.apiKey = null;     // loaded from DB in setDb()
+    this.quotaData = null;  // loaded from DB in setDb()
     this.baseUrl = 'https://www.googleapis.com/youtube/v3';
     this.ytdlpService = null;
   }
@@ -20,73 +17,64 @@ class YouTubeApiService {
     this.ytdlpService = ytdlpService;
   }
 
-  /** Binds the database and loads the API key. Called once inside db.ready.then(). */
+  /** Binds the database, loads API key and quota. Called once inside db.ready.then(). */
   setDb(db) {
     this.db = db;
-    const stored = db.getConfig(DB_CONFIG_KEY);
-    if (stored) {
+
+    // Load API key
+    const storedKey = db.getConfig(DB_KEY_API_KEY);
+    if (storedKey) {
       try {
-        this.apiKey = decrypt(stored);
+        this.apiKey = decrypt(storedKey);
         logger.debug('YouTube API key loaded from database');
       } catch (err) {
         logger.error('Failed to decrypt YouTube API key:', err);
-        this.apiKey = null;
       }
+    }
+
+    // Load quota (reset if the day has rolled over, init if missing)
+    const storedQuota = db.getConfig(DB_KEY_QUOTA);
+    if (storedQuota) {
+      try {
+        const data = JSON.parse(storedQuota);
+        this.quotaData = new Date() > new Date(data.resetTime)
+          ? this._initQuota()
+          : data;
+      } catch (err) {
+        logger.error('Failed to parse quota data:', err);
+        this.quotaData = this._initQuota();
+      }
+    } else {
+      this.quotaData = this._initQuota();
     }
   }
 
   saveApiKey(apiKey) {
     const trimmed = apiKey.trim();
-    this.db.setConfig(DB_CONFIG_KEY, encrypt(trimmed));
+    this.db.setConfig(DB_KEY_API_KEY, encrypt(trimmed));
     this.apiKey = trimmed;
     logger.info('YouTube API key saved');
     return true;
   }
 
   deleteApiKey() {
-    this.db.setConfig(DB_CONFIG_KEY, null);
+    this.db.setConfig(DB_KEY_API_KEY, null);
     this.apiKey = null;
     logger.info('YouTube API key deleted');
     return true;
   }
 
-  loadQuotaData() {
-    try {
-      if (fs.existsSync(this.quotaFile)) {
-        const data = JSON.parse(fs.readFileSync(this.quotaFile, 'utf8'));
-        // Check if we need to reset (new day)
-        const now = new Date();
-        const resetTime = new Date(data.resetTime);
-        if (now > resetTime) {
-          return this.initQuotaData();
-        }
-        return data;
-      }
-    } catch (err) {
-      logger.error('Failed to load quota data:', err);
-    }
-    return this.initQuotaData();
-  }
-
-  initQuotaData() {
-    const data = {
-      used: 0,
-      limit: 10000,
-      resetTime: this.getNextMidnightPacific()
-    };
-    this.saveQuotaData(data);
+  _initQuota() {
+    const data = { used: 0, limit: 10000, resetTime: this._nextMidnightPacific() };
+    this._saveQuota(data);
     return data;
   }
 
-  saveQuotaData(data) {
-    try {
-      fs.writeFileSync(this.quotaFile, JSON.stringify(data, null, 2));
-    } catch (err) {
-      logger.error('Failed to save quota data:', err);
-    }
+  _saveQuota(data) {
+    this.db.setConfig(DB_KEY_QUOTA, JSON.stringify(data));
   }
 
-  getNextMidnightPacific() {
+  _nextMidnightPacific() {
     const now = new Date();
     const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
     const tomorrow = new Date(pacificTime);
@@ -104,7 +92,7 @@ class YouTubeApiService {
     
     const cost = (costs[operation] || 0) * count;
     this.quotaData.used += cost;
-    this.saveQuotaData(this.quotaData);
+    this._saveQuota(this.quotaData);
     
     logger.debug(`YouTube API quota used: ${cost} units (operation: ${operation})`);
     
@@ -114,8 +102,14 @@ class YouTubeApiService {
   }
 
   getQuotaStatus() {
-    // Reload to get fresh data
-    this.quotaData = this.loadQuotaData();
+    // Re-read from DB to pick up any reset that happened since last load
+    const stored = this.db.getConfig(DB_KEY_QUOTA);
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        this.quotaData = new Date() > new Date(data.resetTime) ? this._initQuota() : data;
+      } catch { /* leave existing in-memory data */ }
+    }
     return {
       used: this.quotaData.used,
       limit: this.quotaData.limit,

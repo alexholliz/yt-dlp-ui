@@ -39,7 +39,7 @@ const CONFIG_PATH = process.env.CONFIG_PATH || path.dirname(COOKIES_PATH);
 
 // Initialize services
 const db = new DB(DB_PATH);
-const youtubeApi = new YouTubeApiService(CONFIG_PATH);
+const youtubeApi = new YouTubeApiService();
 const ytdlp = new YtDlpService(COOKIES_PATH, youtubeApi);
 youtubeApi.setYtDlpService(ytdlp); // Enable handle resolution via yt-dlp
 const downloadManager = new DownloadManager(db, ytdlp, DOWNLOADS_PATH);
