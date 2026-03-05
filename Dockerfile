@@ -50,9 +50,8 @@ RUN mkdir -p /config /downloads
 ARG PORT=8189
 ENV NODE_ENV=production \
     PORT=${PORT} \
-    DB_PATH=/config/yt-dlp-ui.sqlite \
+    CONFIG_PATH=/config \
     DOWNLOADS_PATH=/downloads \
-    COOKIES_PATH=/config/cookies.txt \
     TZ=UTC
 
 EXPOSE ${PORT}

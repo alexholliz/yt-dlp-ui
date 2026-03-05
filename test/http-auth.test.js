@@ -1,261 +1,191 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('assert');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 
 /**
- * HTTP Basic Auth Security Tests
- * 
- * Tests that ALL API endpoints are properly protected by HTTP basic authentication
+ * Session Auth Security Tests
+ *
+ * Tests that ALL API endpoints are properly protected by session-based authentication
  * when BASIC_AUTH_USERNAME and BASIC_AUTH_PASSWORD are set.
- * 
+ *
  * Strategy:
  * 1. Start Docker container with auth environment variables
- * 2. Test every endpoint without credentials (expect 401)
- * 3. Test every endpoint with valid credentials (expect success)
- * 4. Verify no content leakage in 401 responses
- * 
- * This test suite runs locally only (skipped in CI due to Docker overhead).
+ * 2. Test every API endpoint without a session (expect 401)
+ * 3. Verify /login, /css/, /js/ remain public (needed to render the login page)
+ * 4. Log in via POST /auth/login, capture session cookie
+ * 5. Verify every API endpoint returns non-401 with the session cookie
+ * 6. Verify no application data leaks in 401 response bodies
+ *
+ * This test suite runs locally only (skipped in CI — Docker integration tests
+ * are covered by the shell-based checks in build-and-test.yml).
  */
 
 const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
 
-describe('HTTP Basic Auth Security', { skip: isCI }, () => {
+describe('Session Auth Security', { skip: isCI }, () => {
   const TEST_USERNAME = 'testuser';
   const TEST_PASSWORD = 'testpass123';
-  const BASE_URL = 'http://localhost:18190'; // Different port to avoid conflicts
-  
-  let containerProcess;
-  
+  const BASE_URL = 'http://localhost:18190';
+  const CONTAINER = 'yt-dlp-ui-auth-test';
+
   before(async () => {
-    console.log('Starting Docker container with basic auth enabled...');
-    
-    // Stop any existing container on this port
     try {
-      execSync('docker stop yt-dlp-ui-auth-test 2>nul', { stdio: 'ignore' });
-      execSync('docker rm yt-dlp-ui-auth-test 2>nul', { stdio: 'ignore' });
-    } catch (e) {
-      // Ignore errors if container doesn't exist
-    }
-    
-    // Build the image first
-    console.log('Building Docker image...');
-    execSync('docker-compose build', { 
+      execSync(`docker stop ${CONTAINER} 2>/dev/null`, { stdio: 'ignore' });
+      execSync(`docker rm   ${CONTAINER} 2>/dev/null`, { stdio: 'ignore' });
+    } catch (_) {}
+
+    execSync('docker-compose build', {
       cwd: require('path').join(__dirname, '..'),
-      stdio: 'inherit'
+      stdio: 'inherit',
     });
-    
-    // Start container with auth credentials
-    const dockerCmd = `docker run -d --name yt-dlp-ui-auth-test ` +
-      `-p 18190:8189 ` +
-      `-e BASIC_AUTH_USERNAME=${TEST_USERNAME} ` +
-      `-e BASIC_AUTH_PASSWORD=${TEST_PASSWORD} ` +
-      `-e NODE_ENV=test ` +
-      `yt-dlp-ui-yt-dlp-ui`;
-    
-    console.log('Starting container with auth...');
-    execSync(dockerCmd, { stdio: 'inherit' });
-    
-    // Wait for container to be ready
-    console.log('Waiting for container to be ready...');
-    await waitForServer(BASE_URL, 30000);
-    console.log('Container ready!');
+
+    execSync(
+      `docker run -d --name ${CONTAINER} -p 18190:8189 ` +
+        `-e BASIC_AUTH_USERNAME=${TEST_USERNAME} ` +
+        `-e BASIC_AUTH_PASSWORD=${TEST_PASSWORD} ` +
+        `-e SESSION_SECRET=local-test-secret-not-for-production ` +
+        `yt-dlp-ui-yt-dlp-ui`,
+      { stdio: 'inherit' }
+    );
+
+    await waitForServer(BASE_URL, 30_000);
   });
-  
+
   after(() => {
-    console.log('Cleaning up test container...');
     try {
-      execSync('docker stop yt-dlp-ui-auth-test', { stdio: 'ignore' });
-      execSync('docker rm yt-dlp-ui-auth-test', { stdio: 'ignore' });
-    } catch (e) {
-      // Ignore cleanup errors
-    }
+      execSync(`docker stop ${CONTAINER}`, { stdio: 'ignore' });
+      execSync(`docker rm   ${CONTAINER}`, { stdio: 'ignore' });
+    } catch (_) {}
   });
-  
-  // Helper to wait for server to be ready
-  async function waitForServer(url, timeout = 30000) {
-    const startTime = Date.now();
-    while (Date.now() - startTime < timeout) {
+
+  async function waitForServer(url, timeout = 30_000) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
       try {
-        const response = await fetch(url);
-        if (response.status === 401 || response.status === 200) {
-          return; // Server is ready (auth challenge or success)
-        }
-      } catch (e) {
-        // Server not ready yet
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+        const res = await fetch(`${url}/login`);
+        if (res.status === 200) return;
+      } catch (_) {}
+      await new Promise(r => setTimeout(r, 1000));
     }
     throw new Error('Server failed to start within timeout');
   }
-  
-  // Helper to make authenticated request
-  async function authFetch(url, options = {}) {
-    const auth = Buffer.from(`${TEST_USERNAME}:${TEST_PASSWORD}`).toString('base64');
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        'Authorization': `Basic ${auth}`
+
+  /** Log in and return the Set-Cookie header value. */
+  async function login() {
+    const res = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: TEST_USERNAME, password: TEST_PASSWORD }),
+      redirect: 'manual',
+    });
+    // Expect a redirect (302) after successful login
+    assert.ok(
+      res.status === 302 || res.status === 200,
+      `Login should succeed, got ${res.status}`
+    );
+    const cookie = res.headers.get('set-cookie');
+    assert.ok(cookie && cookie.includes('connect.sid'), 'Login should return a session cookie');
+    return cookie.split(';')[0]; // just the name=value portion
+  }
+
+  // Endpoints that must be blocked without a session
+  const protectedEndpoints = [
+    { method: 'GET',    path: '/api/profiles' },
+    { method: 'POST',   path: '/api/profiles' },
+    { method: 'GET',    path: '/api/channels' },
+    { method: 'POST',   path: '/api/channels' },
+    { method: 'GET',    path: '/api/downloads/recent' },
+    { method: 'GET',    path: '/api/stats' },
+    { method: 'GET',    path: '/api/stats/channels' },
+    { method: 'GET',    path: '/api/scheduler/status' },
+    { method: 'POST',   path: '/api/scheduler/run' },
+    { method: 'GET',    path: '/api/cookies' },
+    { method: 'POST',   path: '/api/cookies' },
+    { method: 'DELETE', path: '/api/cookies' },
+    { method: 'POST',   path: '/api/cookies/validate' },
+    { method: 'GET',    path: '/api/youtube-api/key' },
+    { method: 'PUT',    path: '/api/youtube-api/key' },
+    { method: 'DELETE', path: '/api/youtube-api/key' },
+    { method: 'GET',    path: '/api/youtube-api/quota' },
+    { method: 'POST',   path: '/api/youtube-api/quota/reset' },
+    { method: 'GET',    path: '/api/config' },
+    { method: 'PUT',    path: '/api/config' },
+  ];
+
+  // Paths that must stay public so the login page can render
+  const publicPaths = ['/login', '/css/styles.css', '/js/app.js'];
+
+  describe('Unauthenticated access — API endpoints blocked', () => {
+    for (const ep of protectedEndpoints) {
+      it(`${ep.method} ${ep.path} returns 401 without session`, async () => {
+        const res = await fetch(`${BASE_URL}${ep.path}`, { method: ep.method });
+        assert.strictEqual(res.status, 401, `Expected 401, got ${res.status}`);
+
+        // No application data should leak in the body
+        const body = await res.text();
+        assert.ok(
+          !body.includes('youtube.com') &&
+          !body.includes('totalChannels') &&
+          !body.includes('connect.sid'),
+          'Should not leak application data in 401 body'
+        );
+      });
+    }
+  });
+
+  describe('Unauthenticated access — login page and assets remain public', () => {
+    for (const path of publicPaths) {
+      it(`GET ${path} returns 200 without session`, async () => {
+        const res = await fetch(`${BASE_URL}${path}`);
+        assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
+      });
+    }
+  });
+
+  describe('Authenticated access — session grants access', () => {
+    let sessionCookie;
+
+    before(async () => {
+      sessionCookie = await login();
+    });
+
+    for (const ep of protectedEndpoints.filter(e => e.method === 'GET')) {
+      it(`GET ${ep.path} returns non-401 with valid session`, async () => {
+        const res = await fetch(`${BASE_URL}${ep.path}`, {
+          headers: { Cookie: sessionCookie },
+        });
+        assert.notStrictEqual(res.status, 401, `Should not return 401 with a valid session`);
+      });
+    }
+
+    it('invalid credentials are rejected', async () => {
+      const res = await fetch(`${BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'wrong', password: 'wrong' }),
+        redirect: 'manual',
+      });
+      // Expect redirect back to /login?error=1, not a 200 or a new session
+      assert.ok(res.status === 302 || res.status === 401, `Got ${res.status}`);
+      const location = res.headers.get('location') || '';
+      if (res.status === 302) {
+        assert.ok(location.includes('error'), 'Should redirect to login with error param');
       }
     });
-  }
-  
-  // List of all endpoints to test
-  const endpoints = [
-    // Static files
-    { method: 'GET', path: '/', description: 'Home page' },
-    { method: 'GET', path: '/css/styles.css', description: 'CSS file' },
-    { method: 'GET', path: '/js/app.js', description: 'JS file' },
-    
-    // Profiles API
-    { method: 'GET', path: '/api/profiles', description: 'Get all profiles' },
-    { method: 'POST', path: '/api/profiles', description: 'Create profile', body: { name: 'Test' } },
-    
-    // Channels API
-    { method: 'GET', path: '/api/channels', description: 'Get all channels' },
-    { method: 'POST', path: '/api/channels', description: 'Create channel', body: { url: 'https://youtube.com/@test' } },
-    
-    // Stats API
-    { method: 'GET', path: '/api/stats', description: 'Get stats' },
-    { method: 'GET', path: '/api/stats/channels', description: 'Get channel stats' },
-    { method: 'GET', path: '/api/downloads/recent', description: 'Get recent downloads' },
-    
-    // Download control API
-    { method: 'GET', path: '/api/download/status', description: 'Get download status' },
-    { method: 'GET', path: '/api/download/queue', description: 'Get download queue' },
-    { method: 'POST', path: '/api/download/start', description: 'Start downloads' },
-    { method: 'POST', path: '/api/download/retry-failed', description: 'Retry failed downloads' },
-    
-    // Scheduler API
-    { method: 'GET', path: '/api/scheduler/status', description: 'Get scheduler status' },
-    { method: 'POST', path: '/api/scheduler/start', description: 'Start scheduler' },
-    { method: 'POST', path: '/api/scheduler/stop', description: 'Stop scheduler' },
-    
-    // Cookies API
-    { method: 'GET', path: '/api/cookies', description: 'Get cookies status' },
-    
-    // YouTube API
-    { method: 'GET', path: '/api/youtube-api/key', description: 'Get API key status' },
-    { method: 'GET', path: '/api/youtube-api/quota', description: 'Get API quota' },
-  ];
-  
-  describe('Unauthenticated Access (Security)', () => {
-    endpoints.forEach(endpoint => {
-      it(`should return 401 for ${endpoint.method} ${endpoint.path} without credentials`, async () => {
-        const url = `${BASE_URL}${endpoint.path}`;
-        const options = {
-          method: endpoint.method,
-          headers: endpoint.body ? { 'Content-Type': 'application/json' } : {},
-        };
-        
-        if (endpoint.body) {
-          options.body = JSON.stringify(endpoint.body);
-        }
-        
-        const response = await fetch(url, options);
-        
-        // Must return 401 Unauthorized
-        assert.strictEqual(
-          response.status, 
-          401, 
-          `${endpoint.method} ${endpoint.path} should return 401 without credentials`
-        );
-        
-        // Should have WWW-Authenticate header
-        const authHeader = response.headers.get('www-authenticate');
-        assert.ok(
-          authHeader && authHeader.includes('Basic'),
-          'Should have WWW-Authenticate: Basic header'
-        );
-        
-        // Should NOT leak content (only auth challenge)
-        const text = await response.text();
-        assert.ok(
-          text.includes('Unauthorized') || text.length < 100,
-          'Should not leak application content in 401 response'
-        );
+
+    it('logout destroys session', async () => {
+      const logoutRes = await fetch(`${BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Cookie: sessionCookie },
+        redirect: 'manual',
       });
-    });
-  });
-  
-  describe('Authenticated Access (Functionality)', () => {
-    it('should allow access to home page with valid credentials', async () => {
-      const response = await authFetch(`${BASE_URL}/`);
-      assert.strictEqual(response.status, 200);
-      const html = await response.text();
-      assert.ok(html.includes('<!DOCTYPE html>'), 'Should return HTML');
-    });
-    
-    it('should allow access to API endpoints with valid credentials', async () => {
-      const response = await authFetch(`${BASE_URL}/api/stats`);
-      assert.ok(
-        response.status === 200 || response.status === 500,
-        'Should not return 401 with valid credentials'
-      );
-    });
-    
-    it('should reject invalid credentials', async () => {
-      const auth = Buffer.from('wronguser:wrongpass').toString('base64');
-      const response = await fetch(`${BASE_URL}/api/stats`, {
-        headers: { 'Authorization': `Basic ${auth}` }
+      assert.ok(logoutRes.status === 302 || logoutRes.status === 200);
+
+      // Cookie should no longer grant access
+      const afterLogout = await fetch(`${BASE_URL}/api/stats`, {
+        headers: { Cookie: sessionCookie },
       });
-      assert.strictEqual(response.status, 401, 'Should reject invalid credentials');
-    });
-  });
-  
-  describe('Content Security', () => {
-    it('should not leak channel data without auth', async () => {
-      const response = await fetch(`${BASE_URL}/api/channels`);
-      assert.strictEqual(response.status, 401);
-      const text = await response.text();
-      assert.ok(
-        !text.includes('youtube.com') && !text.includes('channel'),
-        'Should not leak channel URLs or data'
-      );
-    });
-    
-    it('should not leak profile data without auth', async () => {
-      const response = await fetch(`${BASE_URL}/api/profiles`);
-      assert.strictEqual(response.status, 401);
-      const text = await response.text();
-      assert.ok(
-        !text.includes('template') && !text.includes('format'),
-        'Should not leak profile configuration'
-      );
-    });
-    
-    it('should not leak statistics without auth', async () => {
-      const response = await fetch(`${BASE_URL}/api/stats`);
-      assert.strictEqual(response.status, 401);
-      const text = await response.text();
-      assert.ok(
-        !text.includes('totalChannels') && !text.includes('totalDownloads'),
-        'Should not leak statistics'
-      );
-    });
-  });
-  
-  describe('Static Files Protection', () => {
-    it('should protect HTML files', async () => {
-      const response = await fetch(`${BASE_URL}/`);
-      assert.strictEqual(response.status, 401);
-    });
-    
-    it('should protect CSS files', async () => {
-      const response = await fetch(`${BASE_URL}/css/styles.css`);
-      assert.strictEqual(response.status, 401);
-    });
-    
-    it('should protect JavaScript files', async () => {
-      const response = await fetch(`${BASE_URL}/js/app.js`);
-      assert.strictEqual(response.status, 401);
-    });
-    
-    it('should allow static files with valid credentials', async () => {
-      const response = await authFetch(`${BASE_URL}/css/styles.css`);
-      assert.strictEqual(response.status, 200);
-      const css = await response.text();
-      assert.ok(css.length > 0, 'Should return CSS content');
+      assert.strictEqual(afterLogout.status, 401, 'Session should be invalid after logout');
     });
   });
 });
