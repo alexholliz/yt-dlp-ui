@@ -1,57 +1,53 @@
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const { encrypt, decrypt } = require('./utils/encryption');
+
+const DB_CONFIG_KEY = 'youtube_api_key';
 
 class YouTubeApiService {
   constructor(configPath = '/config') {
     this.configPath = configPath;
-    this.apiKeyFile = path.join(configPath, 'youtube-api-key.txt');
     this.quotaFile = path.join(configPath, 'youtube-api-quota.json');
-    this.apiKey = this.loadApiKey();
+    this.db = null;
+    this.apiKey = null; // loaded from DB in setDb()
     this.quotaData = this.loadQuotaData();
     this.baseUrl = 'https://www.googleapis.com/youtube/v3';
-    this.ytdlpService = null; // Will be set after YtDlpService is created
+    this.ytdlpService = null;
   }
-  
+
   setYtDlpService(ytdlpService) {
     this.ytdlpService = ytdlpService;
   }
 
-  loadApiKey() {
-    try {
-      if (fs.existsSync(this.apiKeyFile)) {
-        return fs.readFileSync(this.apiKeyFile, 'utf8').trim();
+  /** Binds the database and loads the API key. Called once inside db.ready.then(). */
+  setDb(db) {
+    this.db = db;
+    const stored = db.getConfig(DB_CONFIG_KEY);
+    if (stored) {
+      try {
+        this.apiKey = decrypt(stored);
+        logger.debug('YouTube API key loaded from database');
+      } catch (err) {
+        logger.error('Failed to decrypt YouTube API key:', err);
+        this.apiKey = null;
       }
-    } catch (err) {
-      logger.error('Failed to load YouTube API key:', err);
     }
-    return null;
   }
 
   saveApiKey(apiKey) {
-    try {
-      fs.writeFileSync(this.apiKeyFile, apiKey.trim());
-      this.apiKey = apiKey.trim();
-      logger.info('YouTube API key saved');
-      return true;
-    } catch (err) {
-      logger.error('Failed to save YouTube API key:', err);
-      throw err;
-    }
+    const trimmed = apiKey.trim();
+    this.db.setConfig(DB_CONFIG_KEY, encrypt(trimmed));
+    this.apiKey = trimmed;
+    logger.info('YouTube API key saved');
+    return true;
   }
 
   deleteApiKey() {
-    try {
-      if (fs.existsSync(this.apiKeyFile)) {
-        fs.unlinkSync(this.apiKeyFile);
-      }
-      this.apiKey = null;
-      logger.info('YouTube API key deleted');
-      return true;
-    } catch (err) {
-      logger.error('Failed to delete YouTube API key:', err);
-      throw err;
-    }
+    this.db.setConfig(DB_CONFIG_KEY, null);
+    this.apiKey = null;
+    logger.info('YouTube API key deleted');
+    return true;
   }
 
   loadQuotaData() {

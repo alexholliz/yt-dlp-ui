@@ -51,6 +51,7 @@ const services = { db, ytdlp, youtubeApi, downloadManager, scheduler, DOWNLOADS_
 // Wait for DB to initialize
 db.ready.then(() => {
   logger.info('Database ready');
+  youtubeApi.setDb(db); // load encrypted API key from DB
 
   // Load log level from database
   const configLogLevel = db.getConfig('log_level');
